@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* 🎨 Definición de temas */
 @theme {
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(0 0% 3.9%);
@@ -23,7 +22,6 @@
   --color-ring: hsl(0 0% 3.9%);
 }
 
-/* 🌙 Tema oscuro */
 @theme dark {
   --color-background: hsl(0 0% 3.9%);
   --color-foreground: hsl(0 0% 98%);
@@ -46,7 +44,6 @@
   --color-ring: hsl(0 0% 83.1%);
 }
 
-/* 🧩 Utilidades personalizadas */
 @utility border-border {
   border-color: var(--color-border);
 }
@@ -59,7 +56,6 @@
   color: var(--color-foreground);
 }
 
-/* 🌐 Aplicar colores base */
 body {
   @apply bg-background text-foreground;
 }

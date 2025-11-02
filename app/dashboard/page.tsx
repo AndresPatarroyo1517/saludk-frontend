@@ -8,17 +8,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Calendar, ShoppingBag, FileText, CreditCard, AlertCircle, CheckCircle } from 'lucide-react';
-import { citasService, historialService } from '@/lib/api/services';
+import citasService from '@/lib/api/services/citasService';
+import historialService from '@/lib/api/services/historialService';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const router = useRouter();
   const [stats, setStats] = useState({
     proximasCitas: 0,
     historialItems: 0,
     ordenesRecientes: 0,
   });
 
-  useEffect(() => {
+    useEffect(() => {
+    if (!user) {
+      // Si no hay usuario, redirigir a login
+      router.replace('/login');
+      return;
+    }
+
+    // Redirigir según el rol
+    if (user.rol === 'director_medico') {
+      router.replace('/director');
+    } else if (user.rol === 'paciente') {
+      router.replace('/dashboard');
+    } 
+  }, [user, router]);
+
+  /*useEffect(() => {
     const loadStats = async () => {
       try {
         const [citas, historial] = await Promise.all([
@@ -36,7 +54,7 @@ export default function DashboardPage() {
     };
 
     loadStats();
-  }, []);
+  }, []);*/
 
   return (
     <ProtectedRoute allowedRoles={['paciente']}>
