@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store/authStore';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Calendar, ShoppingBag, FileText, CreditCard, AlertCircle, CheckCircle } from 'lucide-react';
-import citasService from '@/lib/api/services/citasService';
-import historialService from '@/lib/api/services/historialService';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
@@ -21,40 +19,6 @@ export default function DashboardPage() {
     ordenesRecientes: 0,
   });
 
-    useEffect(() => {
-    if (!user) {
-      // Si no hay usuario, redirigir a login
-      router.replace('/login');
-      return;
-    }
-
-    // Redirigir según el rol
-    if (user.rol === 'director_medico') {
-      router.replace('/director');
-    } else if (user.rol === 'paciente') {
-      router.replace('/dashboard');
-    } 
-  }, [user, router]);
-
-  /*useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const [citas, historial] = await Promise.all([
-          citasService.getCitas(),
-          historialService.getHistorial(),
-        ]);
-        setStats({
-          proximasCitas: citas.filter((c: any) => c.estado === 'pendiente' || c.estado === 'confirmada').length,
-          historialItems: historial.length,
-          ordenesRecientes: 0,
-        });
-      } catch (error) {
-        console.error('Error al cargar estadísticas:', error);
-      }
-    };
-
-    loadStats();
-  }, []);*/
 
   return (
     <ProtectedRoute allowedRoles={['paciente']}>
@@ -62,7 +26,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">
-              Bienvenido, {user?.nombre}
+              Bienvenido, {user?.datos_personales.nombres || 'Usuario'}
             </h1>
             <p className="text-slate-600 mt-2">
               Gestiona tu salud desde un solo lugar

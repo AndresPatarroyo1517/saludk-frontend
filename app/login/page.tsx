@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { authService } from '@/lib/api/services/loginService';
-import { useAuthStore } from '@/lib/store/authStore';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Stethoscope, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail, Shield, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ROLE_REDIRECTS } from '@/lib/auth.config';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -27,18 +27,17 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, setAuth } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(false);
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -46,52 +45,21 @@ export default function LoginPage() {
     },
   });
 
-  // Verificar si ya está autenticado al montar el componente
+  const rememberMe = watch('rememberMe');
+
+  // ✅ FIX CRÍTICO: Agregar isAuthenticated a dependencias
   useEffect(() => {
-    const checkAuth = async () => {
-      // Verificar si hay usuario en localStorage
-      try {
-        const storedUser = localStorage.getItem('user');
-        const storedToken = localStorage.getItem('token');
-        
-        if (storedUser && storedToken) {
-          const userData = JSON.parse(storedUser);
-          
-          // Si no está en el store, restaurar la sesión
-          if (!user) {
-            setAuth(userData, storedToken);
-          }
-          
-          // Redirigir según el rol
-          const targetPath = userData.rol === 'director_medico' ? '/director' : '/dashboard';
-          router.replace(targetPath);
-          return;
-        }
-        
-        // Verificar si hay usuario en el store de Zustand
-        if (user) {
-          const targetPath = user.rol === 'director_medico' ? '/director' : '/dashboard';
-          router.replace(targetPath);
-          return;
-        }
-      } catch (error) {
-        console.error('Error al verificar autenticación:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
-
-      setIsCheckingAuth(false);
-    };
-
-    checkAuth();
-  }, []);  // Solo ejecutar una vez al montar
+    if (!authLoading && isAuthenticated) {
+      console.log('✅ Usuario autenticado, redirigiendo a dashboard');
+      router.replace('/dashboard');
+    }
+  }, [authLoading, isAuthenticated, router]); // ✅ CORREGIDO
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setServerError(null);
     setLoadingProgress(0);
 
-    // Animación de progreso
     const progressInterval = setInterval(() => {
       setLoadingProgress((prev) => {
         if (prev >= 90) {
@@ -103,37 +71,33 @@ export default function LoginPage() {
     }, 100);
 
     try {
-      const response = await authService.login(data);
-      setLoadingProgress(100);
-      const userData = await authService.me();
+      console.log('🔐 Intentando login...');
+      const response = await login(data.email, data.password, data.rememberMe || false);
       
-      // Guardar preferencia de recordar sesión
+      setLoadingProgress(100);
+      clearInterval(progressInterval);
+      
+      console.log('✅ Login exitoso:', response);
+      
       if (data.rememberMe) {
         localStorage.setItem('rememberMe', 'true');
       }
       
-      // Guardar usuario en el store (el token ya está en las cookies httpOnly)
-      setAuth(userData, response.token || 'cookie-based');
-      
-      setTimeout(() => {
-        toast.success('¡Bienvenido de nuevo!', {
-          icon: <CheckCircle2 className="w-5 h-5" />,
-          description: 'Has iniciado sesión correctamente',
-        });
+      // ✅ El login actualizó el store, el useEffect manejará la redirección
+      toast.success('¡Bienvenido de nuevo!', {
+        icon: <CheckCircle2 className="w-5 h-5" />,
+        description: 'Has iniciado sesión correctamente',
+      });
 
-        // Redirigir según el rol
-        if (userData.rol === 'director_medico') {
-          router.push('/director');
-        } else {
-          router.push('/dashboard');
-        }
-      }, 500);
     } catch (error: any) {
       clearInterval(progressInterval);
       setLoadingProgress(0);
       
+      console.error('❌ Error en login:', error);
+      
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error ||
+                          error.message ||
                           'Error al iniciar sesión. Por favor, verifica tus credenciales.';
       
       setServerError(errorMessage);
@@ -154,8 +118,7 @@ export default function LoginPage() {
     }
   };
 
-  // Mostrar loader mientras verifica autenticación
-  if (isCheckingAuth) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center">
         <div className="text-center">
@@ -166,22 +129,18 @@ export default function LoginPage() {
     );
   }
 
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Elementos decorativos mejorados */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-300 to-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-teal-300 to-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-indigo-200 to-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '4s' }}></div>
-        
-        {/* Partículas decorativas */}
-        <div className="absolute top-20 left-20 w-2 h-2 bg-blue-400 rounded-full animate-ping opacity-30"></div>
-        <div className="absolute bottom-32 right-32 w-2 h-2 bg-teal-400 rounded-full animate-ping opacity-30" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/3 right-20 w-2 h-2 bg-cyan-400 rounded-full animate-ping opacity-30" style={{ animationDelay: '3s' }}></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo y título mejorado */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center space-x-3 mb-4 group">
             <div className="relative">
@@ -206,9 +165,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Card principal mejorado */}
         <Card className="shadow-2xl border border-blue-100/50 backdrop-blur-xl bg-white/95 relative overflow-hidden">
-          {/* Borde decorativo superior */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500"></div>
           
           <CardHeader className="space-y-3 pb-8 pt-8">
@@ -221,7 +178,6 @@ export default function LoginPage() {
           </CardHeader>
           
           <CardContent className="space-y-6 pb-8 px-8">
-            {/* Error del servidor mejorado */}
             {serverError && (
               <Alert variant="destructive" className="animate-in slide-in-from-top-2 duration-300 border-red-200 bg-red-50">
                 <AlertCircle className="h-5 w-5" />
@@ -232,7 +188,6 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              {/* Campo Email mejorado */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-slate-700 font-semibold text-sm flex items-center gap-2">
                   <Mail className="w-4 h-4 text-blue-600" />
@@ -264,7 +219,6 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {/* Campo Contraseña mejorado */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-slate-700 font-semibold text-sm flex items-center gap-2">
                   <Lock className="w-4 h-4 text-blue-600" />
@@ -292,11 +246,7 @@ export default function LoginPage() {
                       className="absolute right-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors focus:outline-none"
                       disabled={isLoading}
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
@@ -308,32 +258,23 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {/* Checkbox Recuérdame */}
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="rememberMe" 
-                    checked={rememberMe}
-                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    {...register('rememberMe')}
                     className="border-2 border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                     disabled={isLoading}
                   />
-                  <label
-                    htmlFor="rememberMe"
-                    className="text-sm font-medium text-slate-700 cursor-pointer select-none"
-                  >
+                  <label htmlFor="rememberMe" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
                     Recuérdame
                   </label>
                 </div>
-                <Link 
-                  href="/forgot-password" 
-                  className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                >
+                <Link href="/forgot-password" className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors">
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
 
-              {/* Barra de progreso mejorada */}
               {isLoading && (
                 <div className="space-y-3 py-2">
                   <div className="relative w-full bg-slate-200 rounded-full h-2.5 overflow-hidden shadow-inner">
@@ -353,7 +294,6 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Botón de envío mejorado */}
               <Button
                 type="submit"
                 className="w-full h-13 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-bold text-base shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
@@ -374,7 +314,6 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Divider */}
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200"></div>
@@ -386,14 +325,10 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Link de registro mejorado */}
             <div className="text-center">
               <p className="text-sm text-slate-600">
                 ¿No tienes una cuenta?{' '}
-                <Link 
-                  href="/register" 
-                  className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors inline-flex items-center gap-1"
-                >
+                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors inline-flex items-center gap-1">
                   Regístrate aquí
                   <span className="text-lg">→</span>
                 </Link>
@@ -402,7 +337,6 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Footer mejorado */}
         <div className="mt-8 text-center space-y-3">
           <p className="text-xs text-slate-500 leading-relaxed">
             Al iniciar sesión, aceptas nuestros{' '}

@@ -1,8 +1,16 @@
 import apiClient from "../client";
+import { User } from "../../store/authStore";
 
 export interface LoginCredentials {
   email: string;
   password: string;
+  rememberMe?: boolean;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  message?: string;
+  usuario?: User;
 }
 
 export interface RegisterData {
@@ -36,15 +44,13 @@ export interface RegisterResponse {
 }
 
 export const authService = {
-  login: async (credentials: LoginCredentials) => {
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const response = await apiClient.post('/login', credentials);
     return response.data;
   },
 
-  register: async (data: RegisterData) => {
-    const response = await apiClient.post<RegisterResponse>('/registro/paciente', data, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+  register: async (data: RegisterData): Promise<RegisterResponse> => {
+    const response = await apiClient.post<RegisterResponse>('/registro/paciente', data);
     return response.data;
   },
 
@@ -53,7 +59,6 @@ export const authService = {
     files.forEach((file) => {
       formData.append('documento', file);
     });
-
     const response = await apiClient.post(
       `/registro/solicitudes/${solicitudId}/documentos`,
       formData,
@@ -64,17 +69,17 @@ export const authService = {
     return response.data;
   },
 
-  logout: async () => {
-    await apiClient.post('/login/logout');
-    localStorage.removeItem('user');
+  logout: async (): Promise<AuthResponse> => {
+    const response = await apiClient.post('/login/logout');
+    return response.data;
   },
 
-  refreshToken: async () => {
+  refreshToken: async (): Promise<AuthResponse> => {
     const response = await apiClient.post('/login/refresh');
     return response.data;
   },
 
-  me: async () => {
+  me: async (): Promise<AuthResponse> => {
     const response = await apiClient.get('/login/me');
     return response.data;
   },
