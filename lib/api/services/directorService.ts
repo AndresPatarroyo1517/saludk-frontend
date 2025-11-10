@@ -25,30 +25,33 @@ export interface KpisResponse {
 }
 
 export const directorService = {
-  getSolicitudes: async (estado?: string) => {
-    const response = await apiClient.get('/director/solicitudes', {
-      params: { estado },
-    });
+  getSolicitudesAprovadas: async (estado?: string) => {
+    const response = await apiClient.get('/validacion/solicitudes/aprobadas');
     return response.data;
   },
 
-  getSolicitud: async (id: string) => {
-    const response = await apiClient.get(`/director/solicitudes/${id}`);
+  getSolicitudesPendientes: async () => {
+    const response = await apiClient.get('/validacion/solicitudes/pendientes-con-errores');
+    return response.data;
+  },
+
+  getDocumentosSolicitud: async (id: string) => {
+    const response = await apiClient.get(`/registro/solicitudes//${id}/documentos`);
     return response.data;
   },
 
   aprobarSolicitud: async (id: string) => {
-    const response = await apiClient.post(`/director/solicitudes/${id}/aprobar`);
+    const response = await apiClient.post(`/validacion/solicitudes/${id}/aprobar`);
     return response.data;
   },
 
-  rechazarSolicitud: async (id: string, motivo: string) => {
-    const response = await apiClient.post(`/director/solicitudes/${id}/rechazar`, { motivo });
+  rechazarSolicitud: async (id: string, motivo_decision: string) => {
+    const response = await apiClient.post(`/validacion/solicitudes/${id}/rechazar`, { motivo_decision });
     return response.data;
   },
 
-  devolverSolicitud: async (id: string, motivo: string) => {
-    const response = await apiClient.post(`/director/solicitudes/${id}/devolver`, { motivo });
+  devolverSolicitud: async (id: string, motivo_decision: string) => {
+    const response = await apiClient.post(`/validacion/solicitudes/${id}/devolver`, { motivo_decision });
     return response.data;
   },
 
