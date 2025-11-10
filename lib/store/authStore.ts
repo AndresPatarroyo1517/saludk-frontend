@@ -10,6 +10,16 @@ export interface User {
   estado?: 'pendiente' | 'aprobado' | 'rechazado';
   plan?: 'basico' | 'completo' | null;
   ultimo_acceso?: string;
+  datos_personales?: {
+    nombres: string;
+    apellidos?: string;
+    tipo_identificacion?: string;
+    numero_identificacion?: string;
+    telefono?: string;
+    tipo_sangre?: string;
+    fecha_nacimiento?: string;
+    genero?: string;
+  };
 }
 
 interface AuthState {

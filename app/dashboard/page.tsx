@@ -26,7 +26,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">
-              Bienvenido, {user?.datos_personales.nombres || 'Usuario'}
+              Bienvenido, {user?.datos_personales?.nombres || 'Usuario'}
             </h1>
             <p className="text-slate-600 mt-2">
               Gestiona tu salud desde un solo lugar
