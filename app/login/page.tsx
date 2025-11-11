@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -27,17 +27,16 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, isAuthenticated, isInitialized } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const redirected = useRef(false); // ✅ Prevenir múltiples redirecciones
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -45,80 +44,58 @@ export default function LoginPage() {
     },
   });
 
-  const rememberMe = watch('rememberMe');
-
-  // ✅ FIX CRÍTICO: Agregar isAuthenticated a dependencias
+  // ✅ Redirigir si ya está autenticado (UNA SOLA VEZ)
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      console.log('✅ Usuario autenticado, redirigiendo a dashboard');
+    if (!isInitialized || redirected.current) {
+      return;
+    }
+
+    if (isAuthenticated) {
+      redirected.current = true;
+      console.log('✅ Usuario ya autenticado, redirigiendo a dashboard');
       router.replace('/dashboard');
     }
-  }, [authLoading, isAuthenticated, router]); // ✅ CORREGIDO
+  }, [isInitialized, isAuthenticated, router]);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setServerError(null);
-    setLoadingProgress(0);
-
-    const progressInterval = setInterval(() => {
-      setLoadingProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 100);
 
     try {
       console.log('🔐 Intentando login...');
       const response = await login(data.email, data.password, data.rememberMe || false);
       
-      setLoadingProgress(100);
-      clearInterval(progressInterval);
+      console.log('✅ Login exitoso');
       
-      console.log('✅ Login exitoso:', response);
-      
-      if (data.rememberMe) {
-        localStorage.setItem('rememberMe', 'true');
-      }
-      
-      // ✅ El login actualizó el store, el useEffect manejará la redirección
       toast.success('¡Bienvenido de nuevo!', {
         icon: <CheckCircle2 className="w-5 h-5" />,
         description: 'Has iniciado sesión correctamente',
       });
 
+      // ✅ La redirección se manejará automáticamente por el useEffect
+      // No necesitamos redirigir manualmente aquí
+
     } catch (error: any) {
-      clearInterval(progressInterval);
-      setLoadingProgress(0);
-      
       console.error('❌ Error en login:', error);
       
       const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error ||
                           error.message ||
-                          'Error al iniciar sesión. Por favor, verifica tus credenciales.';
+                          'Error al iniciar sesión. Verifica tus credenciales.';
       
       setServerError(errorMessage);
       
       toast.error('Error de autenticación', {
         icon: <AlertCircle className="w-5 h-5" />,
         description: errorMessage,
-        duration: 4000,
+        duration: 5000,
       });
-
-      setTimeout(() => {
-        setServerError(null);
-      }, 5000);
     } finally {
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 600);
+      setIsLoading(false);
     }
   };
 
-  if (authLoading) {
+  // Mostrar loader solo mientras inicializa
+  if (!isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center">
         <div className="text-center">
@@ -129,18 +106,21 @@ export default function LoginPage() {
     );
   }
 
+  // Si ya está autenticado, no mostrar nada (se está redirigiendo)
   if (isAuthenticated) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Decoración de fondo */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-300 to-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-teal-300 to-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
+        {/* Header */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center space-x-3 mb-4 group">
             <div className="relative">
@@ -173,7 +153,7 @@ export default function LoginPage() {
               Iniciar Sesión
             </CardTitle>
             <CardDescription className="text-center text-slate-600 text-base">
-              Accede a tu cuenta para gestionar tu información médica de forma segura
+              Accede a tu cuenta para gestionar tu información médica
             </CardDescription>
           </CardHeader>
           
@@ -188,6 +168,7 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Email Field */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-slate-700 font-semibold text-sm flex items-center gap-2">
                   <Mail className="w-4 h-4 text-blue-600" />
@@ -219,6 +200,7 @@ export default function LoginPage() {
                 )}
               </div>
 
+              {/* Password Field */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-slate-700 font-semibold text-sm flex items-center gap-2">
                   <Lock className="w-4 h-4 text-blue-600" />
@@ -258,6 +240,7 @@ export default function LoginPage() {
                 )}
               </div>
 
+              {/* Remember Me & Forgot Password */}
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center space-x-2">
                   <Checkbox 
@@ -275,25 +258,7 @@ export default function LoginPage() {
                 </Link>
               </div>
 
-              {isLoading && (
-                <div className="space-y-3 py-2">
-                  <div className="relative w-full bg-slate-200 rounded-full h-2.5 overflow-hidden shadow-inner">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 transition-all duration-300 ease-out rounded-full relative"
-                      style={{ width: `${loadingProgress}%` }}
-                    >
-                      <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                    <p className="text-xs text-slate-600 font-semibold">
-                      Verificando credenciales...
-                    </p>
-                  </div>
-                </div>
-              )}
-
+              {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full h-13 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-bold text-base shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
@@ -314,6 +279,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
+            {/* Divider */}
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200"></div>
@@ -325,6 +291,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Register Link */}
             <div className="text-center">
               <p className="text-sm text-slate-600">
                 ¿No tienes una cuenta?{' '}
@@ -337,6 +304,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
+        {/* Footer */}
         <div className="mt-8 text-center space-y-3">
           <p className="text-xs text-slate-500 leading-relaxed">
             Al iniciar sesión, aceptas nuestros{' '}

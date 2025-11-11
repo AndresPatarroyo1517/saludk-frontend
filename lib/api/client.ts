@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/lib/store/authStore';
 
 const apiClient = axios.create({
@@ -6,24 +6,34 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, 
+  withCredentials: true, // Enviar cookies automáticamente
+  timeout: 15000, // 15 segundos timeout
 });
 
+// Estado del refresh
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let refreshPromise: Promise<void> | null = null;
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach(prom => {
+// Cola de requests fallidas
+interface FailedRequest {
+  resolve: (value?: any) => void;
+  reject: (error?: any) => void;
+}
+let failedQueue: FailedRequest[] = [];
+
+const processQueue = (error: any = null) => {
+  failedQueue.forEach(promise => {
     if (error) {
-      prom.reject(error);
+      promise.reject(error);
     } else {
-      prom.resolve(token);
+      promise.resolve();
     }
   });
   
   failedQueue = [];
 };
 
+// Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
     // Las cookies httpOnly se envían automáticamente con withCredentials: true
@@ -34,62 +44,87 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Response interceptor - CORREGIDO
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError<any>) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Si es 401 y no hemos intentado refresh todavía
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      
-      // Si el error es TOKEN_EXPIRED, intentar refresh
-      if (error.response?.data?.code === 'TOKEN_EXPIRED') {
-        
-        if (isRefreshing) {
-          // Si ya estamos refrescando, poner esta request en cola
-          return new Promise((resolve, reject) => {
-            failedQueue.push({ resolve, reject });
-          })
-          .then(() => {
-            return apiClient(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
-        }
+    // Si no es 401, rechazar directamente
+    if (error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
 
-        originalRequest._retry = true;
-        isRefreshing = true;
+    // Si ya reintentamos, no volver a intentar
+    if (originalRequest._retry) {
+      useAuthStore.getState().clearAuth();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
 
+    // Si es el endpoint de refresh el que falló, limpiar auth
+    if (originalRequest.url?.includes('/login/refresh')) {
+      useAuthStore.getState().clearAuth();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+
+    // Si el error tiene código TOKEN_EXPIRED, intentar refresh
+    const errorCode = error.response?.data?.code;
+    
+    if (errorCode === 'TOKEN_EXPIRED') {
+      // Si ya estamos refrescando, esperar a que termine
+      if (isRefreshing && refreshPromise) {
         try {
-          // Intentar refrescar el token
-          await apiClient.post('/login/refresh');
-          
-          isRefreshing = false;
-          processQueue(null);
-          
-          // Reintentar la request original
+          await refreshPromise;
+          // Refresh exitoso, reintentar request original
           return apiClient(originalRequest);
         } catch (refreshError) {
-          isRefreshing = false;
-          processQueue(refreshError, null);
-          
-          // Si el refresh falla, limpiar auth y redirigir
+          return Promise.reject(refreshError);
+        }
+      }
+
+      // Marcar request original como reintentada
+      originalRequest._retry = true;
+      
+      // Iniciar proceso de refresh
+      isRefreshing = true;
+      
+      refreshPromise = apiClient.post('/login/refresh')
+        .then(() => {
+          processQueue(); // Resolver todos los requests en cola
+        })
+        .catch((refreshError) => {
+          processQueue(refreshError); // Rechazar todos los requests en cola
           useAuthStore.getState().clearAuth();
-          
           if (typeof window !== 'undefined') {
             window.location.href = '/login';
           }
-          
-          return Promise.reject(refreshError);
-        }
-      } else {
-        // Cualquier otro 401 (token inválido, no autorizado, etc.)
-        useAuthStore.getState().clearAuth();
-        
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
-        }
+          throw refreshError;
+        })
+        .finally(() => {
+          isRefreshing = false;
+          refreshPromise = null;
+        });
+
+      try {
+        await refreshPromise;
+        // Refresh exitoso, reintentar request original
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
+    } 
+    
+    // Otros errores 401 (token inválido, permisos, etc.)
+    if (errorCode === 'NOT_AUTHENTICATED' || errorCode === 'MISSING_REFRESH_TOKEN') {
+      useAuthStore.getState().clearAuth();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
       }
     }
 

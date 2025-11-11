@@ -12,52 +12,54 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isAuthenticated, isInitialized } = useAuth();
   const router = useRouter();
-  const hasChecked = useRef(false);
+  const redirected = useRef(false); // ✅ Prevenir múltiples redirecciones
 
   useEffect(() => {
-    // ✅ Solo verificar UNA VEZ cuando termine de cargar
-    if (isLoading || hasChecked.current) return;
+    // Solo actuar cuando inicialización termine Y no hayamos redirigido antes
+    if (!isInitialized || redirected.current) {
+      return;
+    }
 
-    // Marcar como verificado ANTES de cualquier lógica
-    hasChecked.current = true;
-
-    // ❌ Usuario no autenticado
-    if (!user) {
+    // Usuario no autenticado
+    if (!isAuthenticated || !user) {
+      redirected.current = true;
       console.log('❌ No autenticado, redirigiendo a /login');
       router.replace('/login');
       return;
     }
 
-    // ❌ Usuario sin permisos para esta ruta
+    // Usuario sin permisos
     if (allowedRoles && !allowedRoles.includes(user.rol)) {
-      console.log(`❌ Rol ${user.rol} no permitido, redirigiendo a ${ROLE_REDIRECTS[user.rol]}`);
-      router.replace(ROLE_REDIRECTS[user.rol] || '/dashboard');
+      redirected.current = true;
+      const targetRoute = ROLE_REDIRECTS[user.rol] || '/dashboard';
+      console.log(`❌ Rol ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
+      router.replace(targetRoute);
       return;
     }
 
-    // ✅ Todo OK
-    console.log('✅ Acceso permitido a usuario:', user.email, 'rol:', user.rol);
-  }, [user, isLoading, allowedRoles, router]);
+    // Todo OK
+    console.log('✅ Acceso permitido:', user.email, '| Rol:', user.rol);
+  }, [user, isAuthenticated, isInitialized, allowedRoles, router]);
 
-  // ✅ Mostrar loader mientras carga o verifica
-  if (isLoading || !hasChecked.current) {
+  // Mostrar loader mientras inicializa
+  if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-teal-50">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Cargando...</p>
+          <p className="text-slate-600 font-medium">Verificando sesión...</p>
         </div>
       </div>
     );
   }
 
-  // ✅ Si no hay usuario o no tiene permisos, no mostrar nada (se redirigió)
-  if (!user || (allowedRoles && !allowedRoles.includes(user.rol))) {
+  // Si no autenticado o sin permisos, no mostrar nada
+  if (!isAuthenticated || !user || (allowedRoles && !allowedRoles.includes(user.rol))) {
     return null;
   }
 
-  // ✅ Mostrar contenido protegido
+  // Mostrar contenido protegido
   return <>{children}</>;
 }

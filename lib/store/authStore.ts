@@ -1,54 +1,80 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface User {
   id: number;
-  userId: number;
   email: string;
   rol: 'paciente' | 'medico' | 'director_medico';
   activo: boolean;
-  nombre?: string;
-  estado?: 'pendiente' | 'aprobado' | 'rechazado';
-  plan?: 'basico' | 'completo' | null;
-  ultimo_acceso?: string;
   datos_personales?: {
+    id?: number;
     nombres: string;
     apellidos?: string;
     tipo_identificacion?: string;
     numero_identificacion?: string;
     telefono?: string;
-    tipo_sangre?: string;
     fecha_nacimiento?: string;
     genero?: string;
+    direcciones?: Array<{
+      id?: number;
+      direccion_completa: string;
+      ciudad: string;
+      departamento: string;
+      tipo: string;
+    }>;
   };
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
+  isInitialized: boolean; // Nuevo: saber si ya verificamos autenticación
   setAuth: (user: User) => void;
   clearAuth: () => void;
   updateUser: (user: Partial<User>) => void;
-  setLoading: (loading: boolean) => void;
+  setInitialized: (initialized: boolean) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  
-  setAuth: (user) => {
-    set({ user, isAuthenticated: true, isLoading: false });
-  },
-  
-  clearAuth: () => {
-    set({ user: null, isAuthenticated: false, isLoading: false });
-  },
-  
-  updateUser: (updatedUser) =>
-    set((state) => ({
-      user: state.user ? { ...state.user, ...updatedUser } : null
-    })),
-  
-  setLoading: (loading) => set({ isLoading: loading })
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      isInitialized: false,
+      
+      setAuth: (user) => {
+        set({ 
+          user, 
+          isAuthenticated: true,
+          isInitialized: true 
+        });
+      },
+      
+      clearAuth: () => {
+        set({ 
+          user: null, 
+          isAuthenticated: false,
+          isInitialized: true // Mantener initialized en true
+        });
+      },
+      
+      updateUser: (updatedUser) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updatedUser } : null
+        })),
+      
+      setInitialized: (initialized) => {
+        set({ isInitialized: initialized });
+      }
+    }),
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => sessionStorage), // sessionStorage = se limpia al cerrar pestaña
+      partialize: (state) => ({ 
+        // Solo persistir isAuthenticated, no el user completo (seguridad)
+        isAuthenticated: state.isAuthenticated,
+        isInitialized: state.isInitialized
+      }),
+    }
+  )
+);

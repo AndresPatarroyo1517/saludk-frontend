@@ -1,21 +1,33 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/authStore';
 import authService from '@/lib/api/services/loginService';
-import { useRouter } from 'next/navigation';
+
+// ✅ Variables globales para control estricto (fuera de React)
+let authCheckStarted = false;
+let authCheckCompleted = false;
 
 export function useAuth() {
-  const { user, isAuthenticated, isLoading, setAuth, clearAuth, setLoading } = useAuthStore();
-  const router = useRouter();
-  const hasCheckedAuth = useRef(false); // ✅ Evita múltiples llamadas
+  const { 
+    user, 
+    isAuthenticated, 
+    isInitialized,
+    setAuth, 
+    clearAuth, 
+    setInitialized 
+  } = useAuthStore();
 
-  // ✅ checkAuth sin useCallback (se ejecuta solo una vez)
+  // ✅ Verificación inicial (SOLO UNA VEZ EN TODA LA APP)
   useEffect(() => {
-    // Si ya se verificó la autenticación, no hacer nada
-    if (hasCheckedAuth.current) return;
-    
+    // Si ya completamos o ya empezamos, salir inmediatamente
+    if (authCheckCompleted || authCheckStarted) {
+      return;
+    }
+
+    // Marcar que empezamos ANTES de hacer nada async
+    authCheckStarted = true;
+
     const checkAuth = async () => {
       try {
-        setLoading(true);
         const response = await authService.me();
         
         if (response.success && response.usuario) {
@@ -23,27 +35,34 @@ export function useAuth() {
         } else {
           clearAuth();
         }
-      } catch (error) {
-        console.error('Error al verificar autenticación:', error);
-        clearAuth();
+      } catch (error: any) {
+        if (error.response?.status === 401) {
+          clearAuth();
+        } else {
+          console.error('Error al verificar autenticación:', error);
+          clearAuth();
+        }
       } finally {
-        setLoading(false);
-        hasCheckedAuth.current = true; // ✅ Marcar como verificado
+        setInitialized(true);
+        authCheckCompleted = true;
       }
     };
 
     checkAuth();
-  }, []); // ✅ Array vacío - se ejecuta solo una vez
+  }, []); // ✅ Array vacío - nunca re-ejecutar
 
-  // ✅ Login sin redirección automática
-  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
+  // ✅ Login
+  const login = useCallback(async (
+    email: string, 
+    password: string, 
+    rememberMe = false
+  ) => {
     try {
       const response = await authService.login({ email, password, rememberMe });
       
       if (response.success && response.usuario) {
         setAuth(response.usuario);
         
-        // ✅ Retornar el rol para que el componente redirija
         return {
           success: true,
           rol: response.usuario.rol,
@@ -57,7 +76,7 @@ export function useAuth() {
     }
   }, [setAuth]);
 
-  // ✅ Logout sin redirección automática
+  // ✅ Logout
   const logout = useCallback(async () => {
     try {
       await authService.logout();
@@ -65,36 +84,17 @@ export function useAuth() {
       console.error('Error en logout:', error);
     } finally {
       clearAuth();
-      hasCheckedAuth.current = false; // ✅ Reset para próximo login
+      // Resetear para permitir nuevo login
+      authCheckStarted = false;
+      authCheckCompleted = false;
     }
   }, [clearAuth]);
-
-  // ✅ Función manual para forzar re-verificación
-  const recheckAuth = useCallback(async () => {
-    hasCheckedAuth.current = false;
-    try {
-      setLoading(true);
-      const response = await authService.me();
-      
-      if (response.success && response.usuario) {
-        setAuth(response.usuario);
-      } else {
-        clearAuth();
-      }
-    } catch (error) {
-      clearAuth();
-    } finally {
-      setLoading(false);
-      hasCheckedAuth.current = true;
-    }
-  }, [setAuth, clearAuth, setLoading]);
 
   return {
     user,
     isAuthenticated,
-    isLoading,
+    isInitialized,
     login,
     logout,
-    recheckAuth
   };
 }
