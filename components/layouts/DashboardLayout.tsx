@@ -31,6 +31,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const hideHeaderTitle = pathname?.startsWith('/dashboard/citas');
 
   const handleLogout = () => {
     clearAuth();
@@ -145,9 +146,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </button>
 
             <div className="flex-1 lg:ml-0 ml-4">
-              <h1 className="text-xl font-semibold text-slate-800">
-                {links.find((link) => link.href === pathname)?.label || 'Dashboard'}
-              </h1>
+              {!hideHeaderTitle && (
+                <h1 className="text-xl font-semibold text-slate-800">
+                  {links.find((link) => link.href === pathname)?.label || 'Dashboard'}
+                </h1>
+              )}
             </div>
 
             {user?.plan && user.rol === 'paciente' && (

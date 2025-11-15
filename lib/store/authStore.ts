@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface User {
-  id: number;
+  id: string | number; // Puede ser UUID (string) o número
   email: string;
-  rol: 'paciente' | 'medico' | 'director_medico';
+  rol: 'paciente' | 'medico' | 'director_medico' | 'PACIENTE' | 'MEDICO' | 'DIRECTOR_MEDICO';
   activo: boolean;
+  paciente_id?: string; // UUID del paciente para operaciones médicas
   datos_personales?: {
     id?: number;
     nombres: string;

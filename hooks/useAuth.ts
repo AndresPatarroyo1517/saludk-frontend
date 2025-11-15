@@ -39,7 +39,7 @@ export function useAuth() {
         if (error.response?.status === 401) {
           clearAuth();
         } else {
-          console.error('Error al verificar autenticación:', error);
+          console.error('Error al verificar autenticación: - useAuth.ts:42', error);
           clearAuth();
         }
       } finally {
@@ -81,7 +81,7 @@ export function useAuth() {
     try {
       await authService.logout();
     } catch (error) {
-      console.error('Error en logout:', error);
+      console.error('Error en logout: - useAuth.ts:84', error);
     } finally {
       clearAuth();
       // Resetear para permitir nuevo login
