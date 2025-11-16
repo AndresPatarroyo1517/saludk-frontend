@@ -83,6 +83,22 @@ export const citasService = {
       throw err;
     }
   }
+,
+
+  // Reprogramar una cita existente
+  reprogramarCita: async (citaId: string, data: {
+    medico_id: string;
+    paciente_id: string;
+    fecha_hora: string;
+    modalidad: 'PRESENCIAL' | 'VIRTUAL' | string;
+    motivo_consulta?: string;
+    duracion_minutos?: number;
+    usuario_id?: string;
+  }) => {
+    // Backend: PUT /citas/:citaId (editar una cita existente)
+    const response = await apiClient.put(`/citas/${citaId}`, data);
+    return response.data;
+  }
 };
 
 export default citasService;
