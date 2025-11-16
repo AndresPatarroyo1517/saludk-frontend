@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Stethoscope, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail, Shield, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ROLE_REDIRECTS } from '@/lib/auth.config';
+import { ROLE_REDIRECTS, UserRole } from '@/lib/auth.config';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -27,7 +27,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isInitialized } = useAuth();
+  const { login, isAuthenticated, isInitialized, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,11 +49,16 @@ export default function LoginPage() {
     if (!isInitialized || redirected.current) {
       return;
     }
+    
 
+    //Si ya esta autenticado que lo redirija a la ruta correspondiente
     if (isAuthenticated) {
+      const normalizedRole = user!.rol.toLowerCase() as UserRole;
       redirected.current = true;
-      console.log('✅ Usuario ya autenticado, redirigiendo a dashboard');
-      router.replace('/dashboard');
+      const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
+      console.log(`Rol de login ${user!.rol} redirigiendo a ${targetRoute}`);
+      router.replace(targetRoute);
+      return;
     }
   }, [isInitialized, isAuthenticated, router]);
 
@@ -97,7 +102,7 @@ export default function LoginPage() {
   // Mostrar loader solo mientras inicializa
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
           <p className="text-slate-600 font-medium">Verificando sesión...</p>
@@ -112,11 +117,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center p-6 relative overflow-hidden">
       {/* Decoración de fondo */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-300 to-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-teal-300 to-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-linear-to-br from-blue-300 to-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-linear-to-br from-teal-300 to-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
@@ -124,14 +129,14 @@ export default function LoginPage() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center space-x-3 mb-4 group">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl blur-md opacity-60 group-hover:opacity-80 transition-opacity"></div>
-              <div className="relative w-16 h-16 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-xl transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
+              <div className="absolute inset-0 bg-linear-to-br from-blue-600 to-cyan-500 rounded-2xl blur-md opacity-60 group-hover:opacity-80 transition-opacity"></div>
+              <div className="relative w-16 h-16 bg-linear-to-br from-blue-600 via-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-xl transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                 <Stethoscope className="w-9 h-9 text-white" strokeWidth={2.5} />
                 <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-yellow-300 animate-pulse" />
               </div>
             </div>
             <div>
-              <span className="text-4xl font-bold bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 bg-clip-text text-transparent block">
+              <span className="text-4xl font-bold bg-linear-to-r from-blue-700 via-blue-600 to-cyan-600 bg-clip-text text-transparent block">
                 SaludK
               </span>
               <span className="text-xs font-semibold text-blue-600/70 tracking-wider uppercase">
@@ -146,10 +151,10 @@ export default function LoginPage() {
         </div>
 
         <Card className="shadow-2xl border border-blue-100/50 backdrop-blur-xl bg-white/95 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-blue-500 via-cyan-500 to-teal-500"></div>
           
           <CardHeader className="space-y-3 pb-8 pt-8">
-            <CardTitle className="text-3xl font-bold text-slate-800 text-center bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text">
+            <CardTitle className="text-3xl font-bold text-slate-800 text-center bg-linear-to-r from-slate-800 to-slate-600 bg-clip-text">
               Iniciar Sesión
             </CardTitle>
             <CardDescription className="text-center text-slate-600 text-base">
@@ -175,7 +180,7 @@ export default function LoginPage() {
                   Correo Electrónico
                 </Label>
                 <div className="relative group">
-                  <div className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg opacity-0 group-focus-within:opacity-20 blur transition duration-200`}></div>
+                  <div className={`absolute -inset-0.5 bg-linear-to-r from-blue-500 to-cyan-500 rounded-lg opacity-0 group-focus-within:opacity-20 blur transition duration-200`}></div>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 transition-colors group-focus-within:text-blue-500" />
                     <Input
@@ -194,7 +199,7 @@ export default function LoginPage() {
                 </div>
                 {errors.email && (
                   <div className="flex items-center space-x-2 text-red-600 animate-in slide-in-from-top-1 duration-200 bg-red-50 p-2 rounded-md border border-red-100">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <p className="text-sm font-medium">{errors.email.message}</p>
                   </div>
                 )}
@@ -207,7 +212,7 @@ export default function LoginPage() {
                   Contraseña
                 </Label>
                 <div className="relative group">
-                  <div className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg opacity-0 group-focus-within:opacity-20 blur transition duration-200`}></div>
+                  <div className={`absolute -inset-0.5 bg-linear-to-r from-blue-500 to-cyan-500 rounded-lg opacity-0 group-focus-within:opacity-20 blur transition duration-200`}></div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 transition-colors group-focus-within:text-blue-500" />
                     <Input
@@ -234,7 +239,7 @@ export default function LoginPage() {
                 </div>
                 {errors.password && (
                   <div className="flex items-center space-x-2 text-red-600 animate-in slide-in-from-top-1 duration-200 bg-red-50 p-2 rounded-md border border-red-100">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <p className="text-sm font-medium">{errors.password.message}</p>
                   </div>
                 )}
@@ -261,10 +266,10 @@ export default function LoginPage() {
               {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-13 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-bold text-base shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
+                className="w-full h-13 bg-linear-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-bold text-base shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                 disabled={isLoading}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                <div className="absolute inset-0 bg-linear-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />

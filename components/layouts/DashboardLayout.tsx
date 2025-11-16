@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
@@ -21,24 +21,62 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import loginService from "@/lib/api/services/loginService";
+import { UserRole } from '@/lib/auth.config';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+}
+
+interface NavLink {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { user, clearAuth } = useAuthStore();
+  const { user, clearAuth, setAuth } = useAuthStore();
   const hideHeaderTitle = pathname?.startsWith('/dashboard/citas');
 
-  const handleLogout = () => {
+  useEffect(() => {
+    if (!user) {
+      loginService.me()
+        .then(res => {
+          if (res.usuario) {
+            setAuth(res.usuario); // Marca isInitialized: true
+          } else {
+            clearAuth();       // También marca isInitialized: true internamente
+          }
+        })
+        .catch(() => clearAuth());
+    }
+  }, [user, setAuth, clearAuth]);
+
+  const handleLogout = async () => {
+    try {
+      await loginService.logout();
+    } catch (e) {
+
+      console.error('Error en logout:', e);
+    }
+
     clearAuth();
-    router.push('/login');
+    router.replace('/login');
   };
 
-  const pacienteLinks = [
+  if (!user) {
+    // Opcional: mostrar un loader mientras se inicializa el user
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-gray-500">Cargando...</p>
+      </div>
+    );
+  }
+
+  const pacienteLinks: NavLink[] = [
     { href: '/dashboard', icon: Home, label: 'Inicio' },
     { href: '/dashboard/planes', icon: CreditCard, label: 'Planes' },
     { href: '/dashboard/medicos', icon: Stethoscope, label: 'Médicos' },
@@ -48,13 +86,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: '/dashboard/calificaciones', icon: Star, label: 'Calificaciones' },
   ];
 
-  const directorLinks = [
+  const directorLinks: NavLink[] = [
     { href: '/director', icon: Home, label: 'Dashboard' },
     { href: '/director/solicitudes', icon: ClipboardList, label: 'Solicitudes' },
     { href: '/director/panel', icon: BarChart3, label: 'Reportes' },
   ];
 
-  const links = user?.rol === 'director_medico' ? directorLinks : pacienteLinks;
+  let links: NavLink[] = [];
+  if (user?.rol) {
+    const normalizedRole = user.rol.toLowerCase() as UserRole;
+    console.log(`Del dashboard ${normalizedRole}`);
+    switch (normalizedRole) {
+      case 'director_medico':
+        links = directorLinks;
+        break;
+      case 'paciente':
+        links = pacienteLinks;
+        break;
+      // case 'medico':
+      //   links = medicoLinks;
+      //   break;
+      default:
+        links = [];
+        break;
+    }
+  } else {
+    console.log(`No hay rol`);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -75,7 +133,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-6 border-b">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-400 rounded-lg flex items-center justify-center">
                 <Stethoscope className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-slate-800">SaludK</span>
@@ -118,7 +176,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-800 truncate">
-                  {user?.nombre} {user?.apellido}
+                  {user?.datos_personales?.nombres} {user?.datos_personales?.apellidos}
                 </p>
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>

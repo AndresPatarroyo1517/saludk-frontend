@@ -30,11 +30,12 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       return;
     }
 
+    const normalizedRole = user.rol.toLowerCase() as UserRole;
     // Usuario sin permisos
-    if (allowedRoles && !allowedRoles.includes(user.rol)) {
+    if (allowedRoles && !allowedRoles.includes(normalizedRole)) {
       redirected.current = true;
-      const targetRoute = ROLE_REDIRECTS[user.rol] || '/dashboard';
-      console.log(`❌ Rol ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
+      const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
+      console.log(`❌ Rol protected ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
       router.replace(targetRoute);
       return;
     }
@@ -46,7 +47,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   // Mostrar loader mientras inicializa
   if (!isInitialized) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-teal-50">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 to-teal-50">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
           <p className="text-slate-600 font-medium">Verificando sesión...</p>
@@ -56,7 +57,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   // Si no autenticado o sin permisos, no mostrar nada
-  if (!isAuthenticated || !user || (allowedRoles && !allowedRoles.includes(user.rol))) {
+  if (!isAuthenticated || !user || (allowedRoles && !allowedRoles.includes(user.rol.toLowerCase() as UserRole))) {
     return null;
   }
 
