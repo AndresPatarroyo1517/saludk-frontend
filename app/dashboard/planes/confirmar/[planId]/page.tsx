@@ -21,37 +21,23 @@ import { toast } from 'sonner';
 import MetodoPagoSelector from '@/components/checkout/MetodoPagoSelector';
 import StripeCheckout from '@/components/checkout/StripeCheckout';
 import pagoService from '@/lib/api/services/pagoService';
+import { planesService } from '@/lib/api/services/planesService';
 import { useAuthStore } from '@/lib/store/authStore';
 
-// Datos de planes (deberías obtenerlos de tu API)
-const planesData: Record<string, any> = {
-  'basico': {
-    id: 'basico',
-    nombre: 'Plan Básico',
-    precio: 29.99,
-    descripcion: 'Ideal para cuidado médico esencial',
-    beneficios: [
-      '2 consultas médicas al mes',
-      'Historial médico digital',
-      'Descuentos en farmacia (10%)',
-    ],
-  },
-  'completo': {
-    id: 'completo',
-    nombre: 'Plan Completo',
-    precio: 49.99,
-    descripcion: 'Cobertura completa de salud',
-    beneficios: [
-      'Consultas médicas ilimitadas',
-      'Especialistas certificados',
-      'Descuentos especiales en farmacia (20%)',
-      'Telemedicina incluida',
-    ],
-  },
-};
+interface Plan {
+  id: string;
+  nombre: string;
+  codigo: string;
+  descripcion: string;
+  precio_mensual: string;
+  duracion_meses: string;
+  beneficios: string[];
+  consultas_virtuales_incluidas: string;
+  consultas_presenciales_incluidas: string;
+}
 
-type MetodoPago = 'TARJETA' | 'PSE' | 'CONSIGNACION';
-type Step = 'seleccion' | 'pago';
+// ✅ CORREGIDO: Usar 'PASARELA' en lugar de 'PSE'
+type MetodoPago = 'TARJETA' | 'PASARELA' | 'CONSIGNACION';
 
 export default function ConfirmarSuscripcionPage() {
   const router = useRouter();
@@ -59,44 +45,101 @@ export default function ConfirmarSuscripcionPage() {
   const { user } = useAuthStore();
   const planId = params.planId as string;
   
-  const [plan, setPlan] = useState<any>(null);
-  const [step, setStep] = useState<Step>('seleccion');
+  const [plan, setPlan] = useState<Plan | null>(null);
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('TARJETA');
   const [loading, setLoading] = useState(false);
-  const [ordenData, setOrdenData] = useState<any>(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
+  const [pagoData, setPagoData] = useState<any>(null);
+  const [suscripcionId, setSuscripcionId] = useState<string | null>(null);
 
   useEffect(() => {
-    const planEncontrado = planesData[planId];
-    if (!planEncontrado) {
-      toast.error('Plan no encontrado');
-      router.push('/planes');
-      return;
-    }
-    setPlan(planEncontrado);
+    const cargarPlan = async () => {
+      try {
+        setLoadingPlan(true);
+        const response = await planesService.getPlanes();
+        const planEncontrado = response.data.find((p: Plan) => p.id === planId);
+        
+        if (!planEncontrado) {
+          toast.error('Plan no encontrado');
+          router.push('/dashboard/planes');
+          return;
+        }
+        
+        setPlan(planEncontrado);
+      } catch (error) {
+        console.error('Error cargando plan:', error);
+        toast.error('Error al cargar el plan');
+        router.push('/dashboard/planes');
+      } finally {
+        setLoadingPlan(false);
+      }
+    };
+
+    cargarPlan();
   }, [planId, router]);
 
-  const handleCrearOrden = async () => {
-    if (!user) {
-      toast.error('Debes iniciar sesión');
+  const procesarPagoCompleto = async () => {
+    if (!user || !plan) {
+      toast.error('Datos incompletos');
       return;
     }
 
+    console.log('🟢 [PAGO] Iniciando proceso completo de pago...');
+    console.log('🟢 [PAGO] Plan ID:', plan.id);
+    console.log('🟢 [PAGO] Método de pago:', metodoPago);
+
     setLoading(true);
+
     try {
-      const response = await pagoService.crearSuscripcion({
-        planId,
-        metodoPago,
+      // PASO 1: Crear suscripción
+      console.log('🟢 [PAGO] Paso 1: Creando suscripción...');
+      const suscripcionResponse = await pagoService.crearSuscripcion({
+        planId: plan.id,
+        metodoPago: metodoPago === 'PASARELA' ? 'PSE' : metodoPago,
       });
 
-      setOrdenData(response.data);
-      setStep('pago');
+      console.log('🟢 [PAGO] Suscripción creada:', suscripcionResponse);
 
-      toast.success('Orden creada exitosamente', {
-        description: 'Procede con el pago',
+      if (!suscripcionResponse.data?.suscripcion?.id) {
+        throw new Error('No se pudo crear la suscripción');
+      }
+
+      const nuevaSuscripcionId = suscripcionResponse.data.suscripcion.id;
+      setSuscripcionId(nuevaSuscripcionId);
+
+      // ✅ CORREGIDO: Usar directamente los datos de la respuesta de crearSuscripcion
+      // El backend ya devuelve stripe, pse, o consignacion según el método
+      console.log('🟢 [PAGO] Datos de pago en respuesta:', {
+        stripe: suscripcionResponse.data.stripe,
+        pse: suscripcionResponse.data.pse,
+        consignacion: suscripcionResponse.data.consignacion
       });
+
+      setPagoData(suscripcionResponse.data);
+
+      // Verificar que tenemos los datos necesarios según el método
+      if (metodoPago === 'TARJETA' && !suscripcionResponse.data.stripe?.client_secret) {
+        console.error('🔴 [ERROR] No hay clientSecret para Stripe');
+        throw new Error('No se pudo inicializar el pago con tarjeta');
+      }
+
+      if (metodoPago === 'PASARELA' && !suscripcionResponse.data.pse?.referencia) {
+        console.error('🔴 [ERROR] No hay referencia para PSE');
+        throw new Error('No se pudo generar la referencia PSE');
+      }
+
+      if (metodoPago === 'CONSIGNACION' && !suscripcionResponse.data.consignacion) {
+        console.error('🔴 [ERROR] No hay datos de consignación');
+        throw new Error('No se pudieron generar las instrucciones de consignación');
+      }
+
+      toast.success('Proceso completado', {
+        description: 'Ahora puedes proceder con el pago',
+      });
+
     } catch (error: any) {
-      console.error('Error creando orden:', error);
-      toast.error('Error al crear la orden', {
+      console.error('🔴 [ERROR] Error en el proceso:', error);
+      toast.error('Error en el proceso de pago', {
         description: error.response?.data?.error || error.message,
       });
     } finally {
@@ -107,27 +150,23 @@ export default function ConfirmarSuscripcionPage() {
   const handlePagoExitoso = () => {
     toast.success('¡Pago completado!', {
       description: 'Tu suscripción ha sido activada',
-      icon: <CheckCircle className="w-5 h-5" />,
     });
     
-    // Redirigir después de 2 segundos
     setTimeout(() => {
       router.push('/dashboard/mis-suscripciones');
     }, 2000);
   };
 
   const handlePagoError = (error: string) => {
-    toast.error('Error en el pago', {
-      description: error,
-    });
+    toast.error('Error en el pago', { description: error });
   };
 
   const copiarTexto = (texto: string, label: string) => {
     navigator.clipboard.writeText(texto);
-    toast.success(`${label} copiado al portapapeles`);
+    toast.success(`${label} copiado`);
   };
 
-  if (!plan) {
+  if (loadingPlan) {
     return (
       <ProtectedRoute allowedRoles={['paciente']}>
         <DashboardLayout>
@@ -139,6 +178,21 @@ export default function ConfirmarSuscripcionPage() {
     );
   }
 
+  if (!plan) {
+    return (
+      <ProtectedRoute allowedRoles={['paciente']}>
+        <DashboardLayout>
+          <div className="flex items-center justify-center min-h-[400px]">
+            <p className="text-slate-600">Plan no encontrado</p>
+          </div>
+        </DashboardLayout>
+      </ProtectedRoute>
+    );
+  }
+
+  const precio = parseFloat(plan.precio_mensual);
+  const mostrarFormularioPago = pagoData && suscripcionId;
+
   return (
     <ProtectedRoute allowedRoles={['paciente']}>
       <DashboardLayout>
@@ -147,27 +201,26 @@ export default function ConfirmarSuscripcionPage() {
           <div>
             <Button
               variant="ghost"
-              onClick={() => step === 'pago' ? setStep('seleccion') : router.push('/planes')}
+              onClick={() => router.push('/dashboard/planes')}
               className="mb-4"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver
+              Volver a planes
             </Button>
             <h1 className="text-3xl font-bold text-slate-800">
-              {step === 'seleccion' ? 'Confirmar Suscripción' : 'Completar Pago'}
+              {mostrarFormularioPago ? 'Completar Pago' : 'Confirmar Suscripción'}
             </h1>
             <p className="text-slate-600 mt-2">
-              {step === 'seleccion' 
-                ? 'Revisa los detalles y selecciona tu método de pago'
-                : 'Procede con el pago de tu suscripción'
+              {mostrarFormularioPago 
+                ? 'Procede con el pago de tu suscripción'
+                : 'Revisa los detalles y selecciona tu método de pago'
               }
             </p>
           </div>
 
-          {/* Contenido según el step */}
-          {step === 'seleccion' ? (
+          {!mostrarFormularioPago ? (
+            // PASO 1: Selección de método de pago
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Columna izquierda: Método de pago */}
               <div className="lg:col-span-2">
                 <MetodoPagoSelector
                   metodoPago={metodoPago}
@@ -176,7 +229,6 @@ export default function ConfirmarSuscripcionPage() {
                 />
               </div>
 
-              {/* Columna derecha: Resumen */}
               <div className="space-y-6">
                 <Card className="border-blue-100 shadow-lg sticky top-6">
                   <CardHeader className="pb-4">
@@ -186,14 +238,12 @@ export default function ConfirmarSuscripcionPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Plan seleccionado */}
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-slate-600">Plan seleccionado</p>
                       <p className="text-lg font-bold text-slate-800">{plan.nombre}</p>
                       <p className="text-sm text-slate-600">{plan.descripcion}</p>
                     </div>
 
-                    {/* Beneficios */}
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-slate-600">Beneficios incluidos</p>
                       <ul className="space-y-1.5">
@@ -206,12 +256,11 @@ export default function ConfirmarSuscripcionPage() {
                       </ul>
                     </div>
 
-                    {/* Precio */}
                     <div className="pt-4 border-t border-slate-200">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-slate-600">Precio mensual</span>
                         <span className="text-2xl font-bold text-slate-800">
-                          ${plan.precio}
+                          ${precio.toLocaleString('es-CO')}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -220,9 +269,8 @@ export default function ConfirmarSuscripcionPage() {
                       </div>
                     </div>
 
-                    {/* Botón de continuar */}
                     <Button
-                      onClick={handleCrearOrden}
+                      onClick={procesarPagoCompleto}
                       disabled={loading}
                       className="w-full h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
                     >
@@ -240,29 +288,31 @@ export default function ConfirmarSuscripcionPage() {
               </div>
             </div>
           ) : (
-            // Step 2: Pago
+            // PASO 2: Formulario de pago
             <div className="max-w-2xl mx-auto space-y-6">
-              {/* Stripe Checkout */}
-              {metodoPago === 'TARJETA' && ordenData?.stripe && (
+              {/* Stripe Checkout - CORREGIDO: usar clientSecret (no client_secret) */}
+              {metodoPago === 'TARJETA' && pagoData?.stripe && (
                 <StripeCheckout
-                  clientSecret={ordenData.stripe.client_secret}
-                  monto={ordenData.stripe.amount_usd}
-                  montoCOP={ordenData.stripe.amount_cop}
+                  clientSecret={pagoData.stripe.clientSecret} // ✅ clientSecret, no client_secret
+                  monto={pagoData.stripe.amount_usd || precio / 4000} // Conversión aproximada si no viene
+                  montoCOP={precio}
                   onSuccess={handlePagoExitoso}
                   onError={handlePagoError}
                   descripcion={`Suscripción ${plan.nombre}`}
                 />
               )}
 
-              {/* PSE */}
-              {metodoPago === 'PSE' && ordenData?.pse && (
+              {/* PASARELA (PSE) - CORREGIDO: usar pse en lugar de pse */}
+              {metodoPago === 'PASARELA' && pagoData?.pse && (
                 <Card className="border-teal-100 shadow-lg">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <CheckCircle className="w-6 h-6 text-teal-600" />
                       Pago PSE en Proceso
                     </CardTitle>
-                    <CardDescription>{ordenData.pse.mensaje}</CardDescription>
+                    <CardDescription>
+                      {pagoData.pse.mensaje || 'Procede con el pago PSE usando la referencia proporcionada'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Alert>
@@ -279,12 +329,12 @@ export default function ConfirmarSuscripcionPage() {
                       </p>
                       <div className="flex items-center gap-2">
                         <code className="flex-1 text-lg font-mono text-teal-700">
-                          {ordenData.pse.referencia}
+                          {pagoData.pse.referencia}
                         </code>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => copiarTexto(ordenData.pse.referencia, 'Referencia')}
+                          onClick={() => copiarTexto(pagoData.pse.referencia, 'Referencia')}
                         >
                           <Copy className="w-4 h-4" />
                         </Button>
@@ -302,7 +352,7 @@ export default function ConfirmarSuscripcionPage() {
               )}
 
               {/* Consignación */}
-              {metodoPago === 'CONSIGNACION' && ordenData?.consignacion && (
+              {metodoPago === 'CONSIGNACION' && pagoData?.consignacion && (
                 <Card className="border-slate-200 shadow-lg">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -317,7 +367,7 @@ export default function ConfirmarSuscripcionPage() {
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        {ordenData.consignacion.nota}
+                        {pagoData.consignacion.nota || 'Una vez realizada la consignación, tu suscripción se activará.'}
                       </AlertDescription>
                     </Alert>
 
@@ -327,7 +377,7 @@ export default function ConfirmarSuscripcionPage() {
                         <p className="text-sm font-semibold text-slate-600 mb-1">Banco:</p>
                         <div className="flex items-center justify-between">
                           <p className="text-lg font-bold text-slate-800">
-                            {ordenData.consignacion.banco}
+                            {pagoData.consignacion.banco}
                           </p>
                         </div>
                       </div>
@@ -339,13 +389,13 @@ export default function ConfirmarSuscripcionPage() {
                         </p>
                         <div className="flex items-center gap-2">
                           <code className="flex-1 text-lg font-mono text-slate-800">
-                            {ordenData.consignacion.numeroCuenta}
+                            {pagoData.consignacion.numeroCuenta}
                           </code>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => 
-                              copiarTexto(ordenData.consignacion.numeroCuenta, 'Número de cuenta')
+                              copiarTexto(pagoData.consignacion.numeroCuenta, 'Número de cuenta')
                             }
                           >
                             <Copy className="w-4 h-4" />
@@ -357,33 +407,35 @@ export default function ConfirmarSuscripcionPage() {
                       <div className="p-4 bg-slate-50 rounded-lg">
                         <p className="text-sm font-semibold text-slate-600 mb-1">Monto a consignar:</p>
                         <p className="text-2xl font-bold text-slate-800">
-                          ${ordenData.consignacion.monto.toLocaleString('es-CO')} COP
+                          ${pagoData.consignacion.monto?.toLocaleString('es-CO') || precio.toLocaleString('es-CO')} COP
                         </p>
                       </div>
 
                       {/* Código de referencia */}
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm font-semibold text-blue-900 mb-1">
-                          Código de referencia:
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <code className="flex-1 text-lg font-mono text-blue-700">
-                            {ordenData.consignacion.codigoReferencia}
-                          </code>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => 
-                              copiarTexto(ordenData.consignacion.codigoReferencia, 'Código de referencia')
-                            }
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
+                      {pagoData.consignacion.codigoReferencia && (
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-sm font-semibold text-blue-900 mb-1">
+                            Código de referencia:
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-lg font-mono text-blue-700">
+                              {pagoData.consignacion.codigoReferencia}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => 
+                                copiarTexto(pagoData.consignacion.codigoReferencia, 'Código de referencia')
+                              }
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-blue-700 mt-2">
+                            * Incluye este código en tu consignación
+                          </p>
                         </div>
-                        <p className="text-xs text-blue-700 mt-2">
-                          * Incluye este código en tu consignación
-                        </p>
-                      </div>
+                      )}
                     </div>
 
                     <Button

@@ -7,7 +7,7 @@ export const planesService = {
   },
 
   suscribirPlan: async (planId: string) => {
-    const response = await apiClient.post('/planes/suscribir', { planId });
+    const response = await apiClient.post(`/planes/${planId}`);
     return response.data;
   },
 };

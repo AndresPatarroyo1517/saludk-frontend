@@ -12,9 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle2, AlertCircle, CreditCard, Lock } from 'lucide-react';
-import { toast } from 'sonner';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+// IMPORTANTE: Configura esta variable en tu .env.local
+// NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
+);
 
 interface StripeCheckoutProps {
   clientSecret: string;
@@ -26,13 +29,12 @@ interface StripeCheckoutProps {
 }
 
 function CheckoutForm({ 
-  clientSecret, 
   monto, 
   montoCOP, 
   onSuccess, 
   onError,
   descripcion 
-}: StripeCheckoutProps) {
+}: Omit<StripeCheckoutProps, 'clientSecret'>) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -40,6 +42,8 @@ function CheckoutForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    
 
     if (!stripe || !elements) {
       return;
@@ -52,7 +56,7 @@ function CheckoutForm({
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/pago/success`,
+          return_url: `${window.location.origin}/dashboard/mis-suscripciones`,
         },
         redirect: 'if_required',
       });
@@ -60,14 +64,7 @@ function CheckoutForm({
       if (error) {
         setErrorMessage(error.message || 'Error al procesar el pago');
         onError(error.message || 'Error al procesar el pago');
-        toast.error('Error en el pago', {
-          description: error.message,
-        });
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        toast.success('¡Pago exitoso!', {
-          description: 'Tu pago ha sido procesado correctamente',
-          icon: <CheckCircle2 className="w-5 h-5" />,
-        });
         onSuccess();
       }
     } catch (err: any) {
@@ -122,7 +119,6 @@ function CheckoutForm({
             <PaymentElement 
               options={{
                 layout: 'tabs',
-                paymentMethodOrder: ['card', 'klarna', 'paypal'],
               }}
             />
           </div>
@@ -166,6 +162,23 @@ function CheckoutForm({
 export default function StripeCheckout(props: StripeCheckoutProps) {
   const [elementsOptions, setElementsOptions] = useState<StripeElementsOptions | null>(null);
 
+
+    console.log('🔴 [STRIPE DEBUG] Props recibidas:', props);
+console.log('🔴 [STRIPE DEBUG] clientSecret:', props.clientSecret);
+//console.log('🔴 [STRIPE DEBUG] Tiene stripe data?', !!props.stripeData);
+
+if (!props.clientSecret) {
+  console.error('🔴 [STRIPE ERROR] clientSecret está undefined o vacío');
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription>
+        Error: No se pudo inicializar el pago. Por favor intenta nuevamente.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
   useEffect(() => {
     if (props.clientSecret) {
       setElementsOptions({
@@ -181,15 +194,30 @@ export default function StripeCheckout(props: StripeCheckoutProps) {
             borderRadius: '8px',
           },
         },
+        locale: 'es',
       });
     }
   }, [props.clientSecret]);
 
+  if (!props.clientSecret) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Error: No se pudo inicializar el pago. Por favor intenta nuevamente.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   if (!elementsOptions) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
+      <Card className="border-slate-200">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <span className="ml-3 text-slate-600">Cargando plataforma de pagos...</span>
+        </CardContent>
+      </Card>
     );
   }
 
