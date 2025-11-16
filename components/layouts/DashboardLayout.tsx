@@ -19,6 +19,7 @@ import {
   User,
   ClipboardList,
   BarChart3,
+  CalendarClock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import loginService from "@/lib/api/services/loginService";
@@ -71,9 +72,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   ];
 
   const directorLinks: NavLink[] = [
-    { href: '/director', icon: Home, label: 'Dashboard' },
+    { href: '/director', icon: Home, label: 'Inicio' },
     { href: '/director/solicitudes', icon: ClipboardList, label: 'Solicitudes' },
     { href: '/director/panel', icon: BarChart3, label: 'Reportes' },
+  ];
+
+  const medicoLinks: NavLink[] = [
+    { href: '/medico', icon: Home, label: 'Inicio' },
+    { href: '/medico/perfil', icon: User, label: 'Mi Perfil' },
+    { href: '/medico/citas', icon: CalendarClock, label: 'Citas Medicas' },
   ];
 
   let links: NavLink[] = [];
@@ -82,6 +89,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     switch (normalizedRole) {
       case 'director_medico':
         links = directorLinks;
+        break;
+      case 'medico':
+        links = medicoLinks;
         break;
       case 'paciente':
         links = pacienteLinks;
@@ -111,7 +121,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-6 border-b">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-400 rounded-lg flex items-center justify-center">
                 <Stethoscope className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-slate-800">SaludK</span>
