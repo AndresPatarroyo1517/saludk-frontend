@@ -13,8 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle2, AlertCircle, CreditCard, Lock } from 'lucide-react';
 
-// IMPORTANTE: Configura esta variable en tu .env.local
-// NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 );
@@ -39,13 +37,35 @@ function CheckoutForm({
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false); // ✅ Nuevo estado
+
+  // ✅ Detectar cuando el PaymentElement está listo
+  useEffect(() => {
+    if (!elements) return;
+
+    // Esperar a que el elemento esté completamente montado
+    const checkReady = async () => {
+      const paymentElement = elements.getElement('payment');
+      if (paymentElement) {
+        setIsReady(true);
+      }
+    };
+
+    // Intentar después de un pequeño delay
+    const timer = setTimeout(checkReady, 500);
+    return () => clearTimeout(timer);
+  }, [elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    
-
+    // ✅ Validaciones antes de procesar
     if (!stripe || !elements) {
+      return;
+    }
+
+    if (!isReady) {
+      setErrorMessage('Por favor espera a que se cargue el formulario de pago');
       return;
     }
 
@@ -58,14 +78,28 @@ function CheckoutForm({
         confirmParams: {
           return_url: `${window.location.origin}/dashboard/mis-suscripciones`,
         },
-        redirect: 'if_required',
+        redirect: 'if_required', // ✅ No redirigir si no es necesario
       });
 
       if (error) {
-        setErrorMessage(error.message || 'Error al procesar el pago');
-        onError(error.message || 'Error al procesar el pago');
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        onSuccess();
+        const message = error.message || 'Error al procesar el pago';
+        setErrorMessage(message);
+        onError(message);
+        } else if (paymentIntent) {
+        
+        if (paymentIntent.status === 'succeeded') {
+          console.log('✅ Pago exitoso');
+          onSuccess();
+        } else if (paymentIntent.status === 'processing') {
+          console.log('⏳ Pago en proceso...');
+          setErrorMessage('Tu pago está siendo procesado. Te notificaremos cuando esté completo.');
+        } else if (paymentIntent.status === 'requires_payment_method') {
+          console.log('⚠️ Requiere método de pago');
+          setErrorMessage('El pago fue rechazado. Por favor intenta con otro método de pago.');
+        } else {
+          console.log('⚠️ Estado desconocido:', paymentIntent.status);
+          setErrorMessage(`Estado del pago: ${paymentIntent.status}`);
+        }
       }
     } catch (err: any) {
       const message = err.message || 'Error inesperado al procesar el pago';
@@ -120,8 +154,22 @@ function CheckoutForm({
               options={{
                 layout: 'tabs',
               }}
+              onReady={() => {
+                setIsReady(true);
+              }}
+              onLoadError={(error) => {
+                setErrorMessage('Error al cargar el formulario de pago. Verifica la consola.');
+              }}
             />
           </div>
+
+          {/* ✅ Indicador de carga */}
+          {!isReady && (
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Cargando formulario de pago...</span>
+            </div>
+          )}
 
           {errorMessage && (
             <Alert variant="destructive" className="animate-in slide-in-from-top-2">
@@ -133,13 +181,18 @@ function CheckoutForm({
           {/* Botón de pago */}
           <Button
             type="submit"
-            disabled={!stripe || isProcessing}
+            disabled={!stripe || !isReady || isProcessing} // ✅ Deshabilitar hasta que esté listo
             className="w-full h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold text-lg shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-[1.02]"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Procesando pago...
+              </>
+            ) : !isReady ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Preparando...
               </>
             ) : (
               <>
@@ -162,22 +215,28 @@ function CheckoutForm({
 export default function StripeCheckout(props: StripeCheckoutProps) {
   const [elementsOptions, setElementsOptions] = useState<StripeElementsOptions | null>(null);
 
+  if (!props.clientSecret) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Error: No se pudo inicializar el pago. El clientSecret no está disponible.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
-    console.log('🔴 [STRIPE DEBUG] Props recibidas:', props);
-console.log('🔴 [STRIPE DEBUG] clientSecret:', props.clientSecret);
-//console.log('🔴 [STRIPE DEBUG] Tiene stripe data?', !!props.stripeData);
-
-if (!props.clientSecret) {
-  console.error('🔴 [STRIPE ERROR] clientSecret está undefined o vacío');
-  return (
-    <Alert variant="destructive">
-      <AlertCircle className="h-4 w-4" />
-      <AlertDescription>
-        Error: No se pudo inicializar el pago. Por favor intenta nuevamente.
-      </AlertDescription>
-    </Alert>
-  );
-}
+  // Validar formato del clientSecret
+  if (!props.clientSecret.startsWith('pi_') && !props.clientSecret.startsWith('seti_')) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Error: El clientSecret tiene un formato inválido. Por favor contacta soporte.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   useEffect(() => {
     if (props.clientSecret) {
@@ -199,23 +258,16 @@ if (!props.clientSecret) {
     }
   }, [props.clientSecret]);
 
-  if (!props.clientSecret) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Error: No se pudo inicializar el pago. Por favor intenta nuevamente.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
   if (!elementsOptions) {
     return (
       <Card className="border-slate-200">
-        <CardContent className="flex items-center justify-center py-12">
+        <CardContent className="flex flex-col items-center justify-center py-12 space-y-4">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          <span className="ml-3 text-slate-600">Cargando plataforma de pagos...</span>
+          <span className="text-slate-600">Cargando plataforma de pagos...</span>
+          <div className="text-xs text-slate-400 text-center">
+            <p>clientSecret: {props.clientSecret ? '✅' : '❌'}</p>
+            <p>API Key: {process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? '✅' : '❌'}</p>
+          </div>
         </CardContent>
       </Card>
     );
