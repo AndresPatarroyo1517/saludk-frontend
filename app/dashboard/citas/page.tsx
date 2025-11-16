@@ -9,6 +9,14 @@ import pacienteService from '@/lib/api/services/pacienteService';
 import medicosService from '@/lib/api/services/medicosService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  
+} from '@/components/ui/pagination';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -23,8 +31,18 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
+// Parse a date string as UTC if it has no timezone information.
+// If the value is already a Date, return it. Accepts strings or Date objects.
+const parseAsUTC = (s?: any): Date | null => {
+  if (s == null) return null;
+  if (s instanceof Date) return s;
+  const str = String(s);
+  const hasTZ = /Z$|[+-]\d{2}:?\d{2}$/.test(str);
+  return new Date(hasTZ ? str : str + 'Z');
+};
+
 function FechaBadge({ fecha }: { fecha: string }) {
-  const d = new Date(fecha);
+  const d = parseAsUTC(fecha) ?? new Date(String(fecha));
   const dia = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
   const num = d.getDate();
   const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -69,6 +87,13 @@ export default function MisCitasPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
   const [proximosSlots, setProximosSlots] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'PROXIMAS' | 'CONFIRMADAS' | 'COMPLETADAS' | 'CANCELADAS'>('PROXIMAS');
+  // Paginación
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 4; // resultados por página (mostrar 4 por página)
+  // Toggle para pruebas: si true enviamos la fecha preservando el offset local
+  // (ej: 2025-11-17T14:30:00-05:00). Si false enviamos ISO UTC (ej: 2025-11-17T19:30:00Z).
+  // Cambia este valor a `true` si el backend espera la hora local tal como la eligió el usuario.
+  const SEND_DATES_AS_LOCAL_OFFSET = false;
 
   useEffect(() => {
     const load = async () => {
@@ -82,6 +107,27 @@ export default function MisCitasPage() {
           console.log('DEBUG getCitasPaciente response:', resp);
           const list = resp?.data?.citas ?? resp?.citas ?? resp?.data ?? resp ?? [];
           if (Array.isArray(list) && list.length > 0) {
+            // Debug: show summary of dates and months to detect missing items
+            try {
+              console.group('DEBUG citas summary (load)');
+              console.log('total citas received:', list.length);
+              const mapped = list.map((c: any) => {
+                const d = parseAsUTC(c.fecha_hora) ?? new Date(String(c.fecha_hora));
+                return {
+                  id: c.id,
+                  fecha_hora: c.fecha_hora,
+                  iso: d ? d.toISOString() : null,
+                  month_local: d ? monthKey(d) : null,
+                  month_utc: d ? monthKeyUTC(d) : null,
+                };
+              });
+              console.table(mapped);
+              const months = Array.from(new Set(mapped.map((m: any) => m.month_utc).filter(Boolean)));
+              console.log('months present (UTC):', months);
+              console.groupEnd();
+            } catch (e) {
+              console.warn('Error al generar summary de citas:', e);
+            }
             setCitas(list);
             return;
           }
@@ -123,6 +169,20 @@ export default function MisCitasPage() {
         console.log('DEBUG refresh getCitasPaciente response:', resp);
         const list = resp?.data?.citas ?? resp?.citas ?? resp?.data ?? resp ?? [];
         if (Array.isArray(list) && list.length > 0) {
+          try {
+            console.group('DEBUG citas summary (refresh)');
+            console.log('total citas received (refresh):', list.length);
+            const mapped = list.map((c: any) => {
+              const d = parseAsUTC(c.fecha_hora) ?? new Date(String(c.fecha_hora));
+              return { id: c.id, fecha_hora: c.fecha_hora, iso: d ? d.toISOString() : null, month_local: d ? monthKey(d) : null, month_utc: d ? monthKeyUTC(d) : null };
+            });
+            console.table(mapped);
+            const months = Array.from(new Set(mapped.map((m: any) => m.month_utc).filter(Boolean)));
+            console.log('months present (UTC):', months);
+            console.groupEnd();
+          } catch (e) {
+            console.warn('Error al generar summary de citas (refresh):', e);
+          }
           setCitas(list);
           return;
         }
@@ -185,20 +245,75 @@ export default function MisCitasPage() {
         setDetalleCita(null);
       }
     } catch (err: any) {
-      // log extendido para depuración
-      console.error('Error cancelando cita (detalles):', {
-        message: err?.message,
-        status: err?.response?.status,
-        data: err?.response?.data,
-        config: err?.config && {
-          url: err.config.url,
-          method: err.config.method,
-        }
-      });
+      // Logging mejorado para depuración — intentamos obtener campos útiles
+      try {
+        console.group('Error cancelando cita (detalles)');
+        console.error('raw error object:', err);
+        console.log('isAxiosError:', Boolean(err?.isAxiosError));
+        console.log('message:', err?.message);
+        console.log('response status:', err?.response?.status);
+        console.log('response data:', err?.response?.data);
+        console.log('request config:', err?.config?.url, err?.config?.method);
+        console.groupEnd();
+      } catch (e) {
+        console.error('Falló al loggear el error:', e, err);
+      }
 
-      // Mostrar mensaje amigable
-      const serverMsg = err?.response?.data?.error || err?.response?.data?.mensaje || err?.response?.data || null;
-      alert(serverMsg || err?.message || 'Error cancelando la cita');
+      // Intentar extraer un mensaje de servidor de distintas formas
+      const serverMsg = err?.response?.data?.error
+        || err?.response?.data?.mensaje
+        || (typeof err?.response?.data === 'string' ? err.response.data : null)
+        || err?.message
+        || null;
+
+      // Si fue un error de servidor o de red, intentar un único reintento rápido
+      try {
+        const status = err?.response?.status;
+        if (!err?.response || (typeof status === 'number' && status >= 500)) {
+          try {
+            const retryResp = await citasService.cancelarCita(citaToCancel);
+            console.log('Reintento de cancelación exitoso:', retryResp);
+            try { await refreshCitas(); } catch (e) { console.warn('refreshCitas falló tras reintento:', e); }
+            toast({ title: 'Cita cancelada', description: 'La cita fue cancelada correctamente.', className: 'bg-emerald-50 border-emerald-200 text-emerald-900' });
+            setCitas((prev) => prev.filter((c) => String(c.id) !== String(citaToCancel)));
+            setCancelDialogOpen(false);
+            setCitaToCancel(null);
+            setCanceling(false);
+            return;
+          } catch (retryErr) {
+            console.warn('Reintento de cancelación falló:', retryErr);
+          }
+        }
+      } catch (ignore) {
+        console.warn('Error evaluando reintento:', ignore);
+      }
+
+      // Intento de mitigación: verificar en el backend si la cita ya fue removida
+      try {
+        const paciente_id = user?.paciente_id || user?.id;
+        if (paciente_id) {
+          const resp = await citasService.getCitasPaciente(String(paciente_id));
+          const list = resp?.data?.citas ?? resp?.citas ?? resp?.data ?? resp ?? [];
+          const stillExists = Array.isArray(list) && list.some((c: any) => String(c.id) === String(citaToCancel));
+          if (!stillExists) {
+            toast({
+              title: 'Cita cancelada',
+              description: 'La cita fue cancelada correctamente aunque el servidor devolvió un error.',
+              className: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+            });
+            // asegurarnos de actualizar el estado local
+            setCitas(Array.isArray(list) ? list : []);
+            setCancelDialogOpen(false);
+            setCitaToCancel(null);
+            setCanceling(false);
+            return;
+          }
+        }
+      } catch (refreshErr) {
+        console.warn('check tras error de cancelación falló:', refreshErr);
+      }
+
+      alert(serverMsg || 'Error cancelando la cita');
     } finally {
       setCanceling(false);
     }
@@ -212,6 +327,8 @@ export default function MisCitasPage() {
   // Helpers de filtrado
   const normalizeEstado = (x: any) => String(x?.estado || x?.estado_cita || '').toUpperCase();
   const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  // UTC monthKey avoids local timezone shifts that can move dates across month boundaries
+  const monthKeyUTC = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   const matchesTab = (estado: string) => {
     switch (activeTab) {
       case 'CONFIRMADAS':
@@ -245,14 +362,28 @@ export default function MisCitasPage() {
     // por mes seleccionado
     if (selectedMonth) {
       list = list.filter((c: any) => {
-        const d = new Date(c.fecha_hora);
-        return monthKey(d) === selectedMonth;
+        const d = parseAsUTC(c.fecha_hora) ?? new Date(String(c.fecha_hora));
+        return monthKeyUTC(d) === selectedMonth;
       });
     }
     // ordenar por fecha ascendente
-    list.sort((a: any, b: any) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+    list.sort((a: any, b: any) => (parseAsUTC(a.fecha_hora) ?? new Date(String(a.fecha_hora))).getTime() - (parseAsUTC(b.fecha_hora) ?? new Date(String(b.fecha_hora))).getTime());
     return list;
   })();
+
+  // Ajustar página cuando cambie el conjunto filtrado
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredCitas.length / pageSize));
+    if (page > totalPages) setPage(totalPages);
+  }, [filteredCitas.length]);
+
+  // Cuando el usuario cambia filtros o búsqueda, volver a la primera página
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedMonth, activeTab]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCitas.length / pageSize));
+  const paginatedCitas = filteredCitas.slice((page - 1) * pageSize, page * pageSize);
 
   // Cuando se abre el modal, cargar lista de médicos
   useEffect(() => {
@@ -320,9 +451,65 @@ export default function MisCitasPage() {
         } else if (Array.isArray(resp?.disponibilidad)) {
           list = resp.disponibilidad;
         }
-
         // Filtrar solo slots disponibles
-        const disponibles = list.filter((s: any) => s.disponible);
+        const normalizeSlotTime = (s: any) => {
+          return s?.fecha_hora_inicio || s?.fecha_hora || s?.start || s?.datetime || null;
+        };
+
+        const isFlagTrue = (v: any) => {
+          if (v === true) return true;
+          if (typeof v === 'string') {
+            const low = v.toLowerCase();
+            return low === 'true' || low === 'si' || low === 'sí' || low === '1' || low === 'available' || low === 'disponible';
+          }
+          if (typeof v === 'number') return v === 1;
+          return false;
+        };
+
+        const isSlotAvailable = (s: any) => {
+          // Support multiple possible keys that the backend might return
+          if (isFlagTrue(s?.disponible)) return true;
+          if (isFlagTrue(s?.available)) return true;
+          if (isFlagTrue(s?.is_available)) return true;
+          if (typeof s?.estado === 'string' && s.estado.toLowerCase().includes('disp')) return true;
+          if (typeof s?.status === 'string' && s.status.toLowerCase().includes('avail')) return true;
+          // fallback: if there is an explicit 'ocupado' flag false
+          if (s?.ocupado === false) return true;
+          return false;
+        };
+
+        // Build a set of occupied times for the selected medico from existing citas
+        const occupied = new Set<string>();
+        try {
+          citas.forEach((c: any) => {
+            if (!c) return;
+            const mId = c.medico?.id || c.medico_id || c.medico?.usuario_id || null;
+            if (!mId) return;
+              if (String(mId) === String(selectedMedicoId)) {
+                const t = c.fecha_hora || c.fecha || c.start || null;
+                if (t) {
+                  const dt = parseAsUTC(t) ?? new Date(String(t));
+                  occupied.add(dt.toISOString());
+                }
+              }
+          });
+        } catch (e) {
+          console.warn('Error procesando citas para ocupación:', e);
+        }
+
+        const disponibles = list.filter((s: any) => {
+          try {
+            const timeVal = normalizeSlotTime(s);
+            if (!timeVal) return false;
+              const iso = (parseAsUTC(timeVal) ?? new Date(String(timeVal))).toISOString();
+            // Excluir si coincide con una cita ya agendada para ese médico
+            if (occupied.has(iso)) return false;
+            return isSlotAvailable(s);
+          } catch (e) {
+            return false;
+          }
+        });
+
         setProximosSlots(disponibles);
         console.log('Slots disponibles:', disponibles);
       } catch (err: any) {
@@ -346,8 +533,35 @@ export default function MisCitasPage() {
     
     setBusy(true);
     try {
-      // Validar slot nuevamente
-      const validar = await citasService.validarSlot(selectedMedicoId, { fecha_hora: selectedSlot.fecha_hora_inicio, duracion_minutos: duracion });
+      // Enviar la fecha al backend según la política de envío seleccionada (toggle para pruebas).
+      let fechaToSend: string | undefined = undefined;
+      if (selectedSlot?.fecha_hora_inicio) {
+        if (SEND_DATES_AS_LOCAL_OFFSET) {
+          // Formatear preservando la hora local con el offset (ej: 2025-11-17T14:30:00-05:00)
+          const d = new Date(selectedSlot.fecha_hora_inicio);
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const offsetMin = d.getTimezoneOffset();
+          const sign = offsetMin > 0 ? '-' : '+';
+          const absMin = Math.abs(offsetMin);
+          const offH = pad(Math.floor(absMin / 60));
+          const offM = pad(absMin % 60);
+          fechaToSend = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${offH}:${offM}`;
+          console.log('ConfirmarReserva: fecha original:', selectedSlot?.fecha_hora_inicio, '-> fecha a enviar (local offset):', fechaToSend);
+        } else {
+          // Enviar como ISO UTC
+          fechaToSend = parseAsUTC(selectedSlot.fecha_hora_inicio)?.toISOString() ?? selectedSlot.fecha_hora_inicio;
+          console.log('ConfirmarReserva: fecha original:', selectedSlot?.fecha_hora_inicio, '-> fecha a enviar (UTC):', fechaToSend);
+        }
+      }
+
+      // Validar slot nuevamente usando la misma representación que enviaremos
+      if (!fechaToSend) {
+        alert('Fecha inválida, intenta nuevamente');
+        setBusy(false);
+        return;
+      }
+
+      const validar = await citasService.validarSlot(selectedMedicoId, { fecha_hora: fechaToSend, duracion_minutos: duracion });
       const disponible = validar?.data?.disponible ?? validar?.disponible;
       if (!disponible) {
         alert(validar?.data?.motivo || validar?.motivo || 'El slot ya no está disponible');
@@ -369,7 +583,7 @@ export default function MisCitasPage() {
         medico_id: selectedMedicoId,
         paciente_id: String(pacienteIdToSend),
         usuario_id: String(user.id),
-        fecha_hora: selectedSlot.fecha_hora_inicio,
+        fecha_hora: fechaToSend,
         modalidad: modalidad,
         motivo_consulta: motivo,
         duracion_minutos: duracion
@@ -528,7 +742,7 @@ export default function MisCitasPage() {
                             <option value="">-- Seleccionar horario --</option>
                             {proximosSlots.map((s: any) => (
                               <option key={s.fecha_hora_inicio} value={s.fecha_hora_inicio}>
-                                {new Date(s.fecha_hora_inicio).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })} - {s.modalidad}
+                                  {(parseAsUTC(s.fecha_hora_inicio) ?? new Date(String(s.fecha_hora_inicio))).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })} - {s.modalidad}
                               </option>
                             ))}
                           </select>
@@ -627,8 +841,8 @@ export default function MisCitasPage() {
             )}
 
             <div className="space-y-4">
-              {filteredCitas.map((c) => {
-                const fecha = new Date(c.fecha_hora);
+              {paginatedCitas.map((c) => {
+                const fecha = parseAsUTC(c.fecha_hora) ?? new Date(String(c.fecha_hora));
                 const weekday = fecha.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
                 const day = fecha.getDate();
                 const time = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -689,7 +903,50 @@ export default function MisCitasPage() {
             </div>
 
             {!loading && filteredCitas.length > 0 && (
-              <div className="text-sm text-slate-500">Mostrando {filteredCitas.length} resultados</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-slate-500">Mostrando {filteredCitas.length} resultados</div>
+                <div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationLink
+                          href="#"
+                          aria-label="Anterior"
+                          size="icon"
+                          onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
+                          className={page === 1 ? 'opacity-50 pointer-events-none bg-white border border-slate-200 text-slate-300 h-10 min-w-[44px] flex items-center justify-center rounded-md' : 'bg-white border border-slate-200 text-slate-700 h-10 min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-50'}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </PaginationLink>
+                      </PaginationItem>
+
+                      <PaginationItem>
+                        <PaginationLink
+                          href="#"
+                          size="icon"
+                          aria-current="page"
+                          onClick={(e) => { e.preventDefault(); }}
+                          className={'bg-blue-500 border-blue-500 text-white h-10 min-w-[44px] flex items-center justify-center rounded-md shadow-sm'}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+
+                      <PaginationItem>
+                        <PaginationLink
+                          href="#"
+                          aria-label="Siguiente"
+                          size="icon"
+                          onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(Math.ceil(filteredCitas.length / pageSize), p + 1)); }}
+                          className={page === Math.ceil(filteredCitas.length / pageSize) ? 'opacity-50 pointer-events-none bg-white border border-slate-200 text-slate-300 h-10 min-w-[44px] flex items-center justify-center rounded-md' : 'bg-white border border-slate-200 text-slate-700 h-10 min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-50'}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </PaginationLink>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              </div>
             )}
           </div>
           {/* Modal de Detalles de Cita */}
@@ -708,7 +965,7 @@ export default function MisCitasPage() {
                     <div>
                       <div className="text-xs uppercase text-slate-500">Fecha y hora</div>
                       <div className="font-medium text-slate-900">
-                        {new Date(detalleCita.fecha_hora).toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'short' })}
+                        {(parseAsUTC(detalleCita.fecha_hora) ?? new Date(String(detalleCita.fecha_hora))).toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'short' })}
                       </div>
                     </div>
                     <div>
@@ -776,3 +1033,4 @@ export default function MisCitasPage() {
     </ProtectedRoute>
   );
 }
+

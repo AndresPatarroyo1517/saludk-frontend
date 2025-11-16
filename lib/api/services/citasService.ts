@@ -67,10 +67,21 @@ export const citasService = {
     return [];
   },
 
-  // Cancelar cita (DELETE /citas/:citaId/cancelar con body motivo_cancelacion)
-  cancelarCita: async (citaId: string, motivo_cancelacion?: string) => {
-    const response = await apiClient.delete(`/citas/${citaId}/cancelar`, { data: { motivo_cancelacion } });
-    return response.data;
+  // Cancelar cita (DELETE /citas/:citaId/cancelar) — el endpoint solo necesita el ID
+  cancelarCita: async (citaId: string) => {
+    try {
+      const response = await apiClient.delete(`/citas/${citaId}/cancelar`);
+      return response.data;
+    } catch (err: any) {
+      try {
+        console.error('[citasService.cancelarCita] Axios error status: - citasService.ts:77', err?.response?.status);
+        console.error('[citasService.cancelarCita] Axios error data: - citasService.ts:78', err?.response?.data);
+        console.error('[citasService.cancelarCita] Axios error headers: - citasService.ts:79', err?.response?.headers);
+      } catch (e) {
+        console.error('[citasService.cancelarCita] Error al loggear respuesta del servidor - citasService.ts:81', e);
+      }
+      throw err;
+    }
   }
 };
 
