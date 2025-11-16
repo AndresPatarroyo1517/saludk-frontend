@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import {ProtectedRoute} from '@/components/ProtectedRoute';
+import { useRouter } from 'next/navigation';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/lib/store/authStore';
 
@@ -42,44 +43,12 @@ const planes = [
 ];
 
 export default function PlanesPage() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [loading, setLoading] = useState<string | null>(null);
 
   const handleSuscribirse = async (planId: string) => {
-    if (user?.estado !== 'aprobado') {
-      toast.error('Tu cuenta debe estar aprobada para suscribirte a un plan');
-      return;
-    }
-
-    setLoading(planId);
-    try {
-      const response = await fetch('/api/checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'plan',
-          planId,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al crear sesión de pago');
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.success('Suscripción procesada exitosamente');
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Error al procesar el pago');
-    } finally {
-      setLoading(null);
-    }
+    router.push(`/planes/confirmar/${planId}`);
   };
 
   return (
@@ -117,7 +86,8 @@ export default function PlanesPage() {
               >
                 {plan.destacado && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <div className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
+                      <Sparkles className="w-4 h-4" />
                       Más Popular
                     </div>
                   </div>
@@ -190,7 +160,7 @@ export default function PlanesPage() {
                   ¿Qué métodos de pago aceptan?
                 </h4>
                 <p className="text-slate-600 text-sm">
-                  Aceptamos todas las tarjetas de crédito y débito principales a través de Stripe.
+                  Aceptamos tarjetas de crédito/débito (Stripe), PSE y consignación bancaria.
                 </p>
               </div>
             </CardContent>

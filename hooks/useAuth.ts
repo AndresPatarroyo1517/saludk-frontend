@@ -2,10 +2,6 @@ import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/authStore';
 import authService from '@/lib/api/services/loginService';
 
-// ✅ Variables globales para control estricto (fuera de React)
-let authCheckStarted = false;
-let authCheckCompleted = false;
-
 export function useAuth() {
   const { 
     user, 
@@ -16,15 +12,10 @@ export function useAuth() {
     setInitialized 
   } = useAuthStore();
 
-  // ✅ Verificación inicial (SOLO UNA VEZ EN TODA LA APP)
   useEffect(() => {
-    // Si ya completamos o ya empezamos, salir inmediatamente
-    if (authCheckCompleted || authCheckStarted) {
+    if (isInitialized) {
       return;
     }
-
-    // Marcar que empezamos ANTES de hacer nada async
-    authCheckStarted = true;
 
     const checkAuth = async () => {
       try {
@@ -39,19 +30,17 @@ export function useAuth() {
         if (error.response?.status === 401) {
           clearAuth();
         } else {
-          console.error('Error al verificar autenticación: - useAuth.ts:42', error);
+          console.error('Error al verificar autenticación:', error);
           clearAuth();
         }
       } finally {
         setInitialized(true);
-        authCheckCompleted = true;
       }
     };
 
     checkAuth();
-  }, []); // ✅ Array vacío - nunca re-ejecutar
+  }, [isInitialized, setAuth, clearAuth, setInitialized]);
 
-  // ✅ Login
   const login = useCallback(async (
     email: string, 
     password: string, 
@@ -76,17 +65,13 @@ export function useAuth() {
     }
   }, [setAuth]);
 
-  // ✅ Logout
   const logout = useCallback(async () => {
     try {
       await authService.logout();
     } catch (error) {
-      console.error('Error en logout: - useAuth.ts:84', error);
+      console.error('Error en logout:', error);
     } finally {
       clearAuth();
-      // Resetear para permitir nuevo login
-      authCheckStarted = false;
-      authCheckCompleted = false;
     }
   }, [clearAuth]);
 

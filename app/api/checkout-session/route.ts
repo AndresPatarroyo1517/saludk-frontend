@@ -16,7 +16,14 @@ export async function POST(req: NextRequest) {
 
       const plan = plans[planId as keyof typeof plans];
       if (!plan) {
-        return NextResponse.json({ error: 'Plan inválido' }, { status: 400 });
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'Plan inválido',
+            code: 'INVALID_PLAN' 
+          }, 
+          { status: 400 }
+        );
       }
 
       line_items = [
@@ -35,6 +42,17 @@ export async function POST(req: NextRequest) {
         },
       ];
     } else if (type === 'productos') {
+      if (!productos || !Array.isArray(productos) || productos.length === 0) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'No se proporcionaron productos',
+            code: 'NO_PRODUCTS' 
+          }, 
+          { status: 400 }
+        );
+      }
+
       line_items = productos.map((producto: any) => ({
         price_data: {
           currency: 'usd',
@@ -45,6 +63,15 @@ export async function POST(req: NextRequest) {
         },
         quantity: producto.cantidad,
       }));
+    } else {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Tipo de pago inválido',
+          code: 'INVALID_TYPE' 
+        }, 
+        { status: 400 }
+      );
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -55,12 +82,22 @@ export async function POST(req: NextRequest) {
       cancel_url: `${process.env.NEXTAUTH_URL}/dashboard?canceled=true`,
     });
 
-    return NextResponse.json({ sessionId: session.id, url: session.url });
+    return NextResponse.json({ 
+      success: true,
+      sessionId: session.id, 
+      url: session.url 
+    });
   } catch (error: any) {
-    console.error('Error al crear sesión de pago:', error);
+    console.error('❌ Error al crear sesión de pago:', error);
+    
     return NextResponse.json(
-      { error: error.message || 'Error al procesar el pago' },
-      { status: 500 }
+      { 
+        success: false,
+        error: error.message || 'Error al procesar el pago',
+        code: error.code || 'PAYMENT_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
+      { status: error.statusCode || 500 }
     );
   }
 }

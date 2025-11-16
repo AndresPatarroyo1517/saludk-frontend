@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Stethoscope, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail, Shield, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ROLE_REDIRECTS } from '@/lib/auth.config';
+import { ROLE_REDIRECTS, UserRole } from '@/lib/auth.config';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -27,11 +27,11 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isInitialized } = useAuth();
+  const { login, isAuthenticated, isInitialized, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const redirected = useRef(false); // ✅ Prevenir múltiples redirecciones
+  const redirected = useRef(false);
 
   const {
     register,
@@ -44,18 +44,18 @@ export default function LoginPage() {
     },
   });
 
-  // ✅ Redirigir si ya está autenticado (UNA SOLA VEZ)
+  // ✅ Simplificado - Solo verificar una vez cuando inicialice
   useEffect(() => {
-    if (!isInitialized || redirected.current) {
-      return;
-    }
-
-    if (isAuthenticated) {
+    if (!isInitialized) return;
+    
+    if (isAuthenticated && user && !redirected.current) {
       redirected.current = true;
-      console.log('✅ Usuario ya autenticado, redirigiendo a dashboard');
-      router.replace('/dashboard');
+      const normalizedRole = user.rol.toLowerCase() as UserRole;
+      const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
+      console.log(`✅ Usuario autenticado, redirigiendo a ${targetRoute}`);
+      router.replace(targetRoute);
     }
-  }, [isInitialized, isAuthenticated, router]);
+  }, [isInitialized, isAuthenticated, user]);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -63,7 +63,7 @@ export default function LoginPage() {
 
     try {
       console.log('🔐 Intentando login...');
-      const response = await login(data.email, data.password, data.rememberMe || false);
+      await login(data.email, data.password, data.rememberMe || false);
       
       console.log('✅ Login exitoso');
       
@@ -72,8 +72,7 @@ export default function LoginPage() {
         description: 'Has iniciado sesión correctamente',
       });
 
-      // ✅ La redirección se manejará automáticamente por el useEffect
-      // No necesitamos redirigir manualmente aquí
+      // ✅ El useEffect manejará la redirección automáticamente
 
     } catch (error: any) {
       console.error('❌ Error en login:', error);
@@ -194,7 +193,7 @@ export default function LoginPage() {
                 </div>
                 {errors.email && (
                   <div className="flex items-center space-x-2 text-red-600 animate-in slide-in-from-top-1 duration-200 bg-red-50 p-2 rounded-md border border-red-100">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <p className="text-sm font-medium">{errors.email.message}</p>
                   </div>
                 )}
@@ -234,7 +233,7 @@ export default function LoginPage() {
                 </div>
                 {errors.password && (
                   <div className="flex items-center space-x-2 text-red-600 animate-in slide-in-from-top-1 duration-200 bg-red-50 p-2 rounded-md border border-red-100">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <p className="text-sm font-medium">{errors.password.message}</p>
                   </div>
                 )}
@@ -264,7 +263,7 @@ export default function LoginPage() {
                 className="w-full h-13 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-bold text-base shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                 disabled={isLoading}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />

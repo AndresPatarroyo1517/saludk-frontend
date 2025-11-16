@@ -1,16 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone", // ✅ correcto
+  output: "standalone",
   eslint: {
-    ignoreDuringBuilds: true, // ✅ correcto
+    ignoreDuringBuilds: true,
   },
-  async rewrites() {
-    return [
+  images: {
+    remotePatterns: [
       {
-        source: '/api/:path*',
-        destination: 'http://localhost:3000/:path*',
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
       },
-    ];
+    ],
   },
 };
 

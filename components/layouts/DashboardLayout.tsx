@@ -21,9 +21,17 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import loginService from "@/lib/api/services/loginService";
+import { UserRole } from '@/lib/auth.config';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+}
+
+interface NavLink {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -33,12 +41,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, clearAuth } = useAuthStore();
   const hideHeaderTitle = pathname?.startsWith('/dashboard/citas');
 
-  const handleLogout = () => {
+  // ✅ ELIMINADO - useAuth() ya maneja la verificación inicial
+  // No necesitamos verificar user aquí, ProtectedRoute ya lo hace
+
+  const handleLogout = async () => {
+    try {
+      await loginService.logout();
+    } catch (e) {
+      console.error('Error en logout:', e);
+    }
+
     clearAuth();
-    router.push('/login');
+    router.replace('/login');
   };
 
-  const pacienteLinks = [
+  // ✅ Si no hay user, ProtectedRoute redirigirá, así que esto nunca se ejecutará
+  if (!user) {
+    return null;
+  }
+
+  const pacienteLinks: NavLink[] = [
     { href: '/dashboard', icon: Home, label: 'Inicio' },
     { href: '/dashboard/planes', icon: CreditCard, label: 'Planes' },
     { href: '/dashboard/medicos', icon: Stethoscope, label: 'Médicos' },
@@ -48,13 +70,27 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: '/dashboard/calificaciones', icon: Star, label: 'Calificaciones' },
   ];
 
-  const directorLinks = [
+  const directorLinks: NavLink[] = [
     { href: '/director', icon: Home, label: 'Dashboard' },
     { href: '/director/solicitudes', icon: ClipboardList, label: 'Solicitudes' },
     { href: '/director/panel', icon: BarChart3, label: 'Reportes' },
   ];
 
-  const links = user?.rol === 'director_medico' ? directorLinks : pacienteLinks;
+  let links: NavLink[] = [];
+  if (user?.rol) {
+    const normalizedRole = user.rol.toLowerCase() as UserRole;
+    switch (normalizedRole) {
+      case 'director_medico':
+        links = directorLinks;
+        break;
+      case 'paciente':
+        links = pacienteLinks;
+        break;
+      default:
+        links = [];
+        break;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -118,7 +154,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-800 truncate">
-                  {user?.nombre} {user?.apellido}
+                  {user?.datos_personales?.nombres} {user?.datos_personales?.apellidos}
                 </p>
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
