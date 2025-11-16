@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Producto } from '../api/services';
+import { Producto } from '@/lib/api/services';
 
 interface CartItem extends Producto {
   cantidad: number;

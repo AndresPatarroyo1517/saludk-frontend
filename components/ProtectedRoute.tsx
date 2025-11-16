@@ -14,10 +14,10 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, isAuthenticated, isInitialized } = useAuth();
   const router = useRouter();
-  const redirected = useRef(false); // ✅ Prevenir múltiples redirecciones
+  const redirected = useRef(false);
 
   useEffect(() => {
-    // Solo actuar cuando inicialización termine Y no hayamos redirigido antes
+    // ✅ Solo depender de isInitialized e isAuthenticated
     if (!isInitialized || redirected.current) {
       return;
     }
@@ -30,24 +30,27 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       return;
     }
 
-    const normalizedRole = user.rol.toLowerCase() as UserRole;
-    // Usuario sin permisos
-    if (allowedRoles && !allowedRoles.includes(normalizedRole)) {
-      redirected.current = true;
-      const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
-      console.log(`❌ Rol protected ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
-      router.replace(targetRoute);
-      return;
+    // ✅ Verificar roles solo si allowedRoles está definido
+    if (allowedRoles && allowedRoles.length > 0) {
+      const normalizedRole = user.rol.toLowerCase() as UserRole;
+      
+      if (!allowedRoles.includes(normalizedRole)) {
+        redirected.current = true;
+        const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
+        console.log(`❌ Rol ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
+        router.replace(targetRoute);
+        return;
+      }
     }
 
-    // Todo OK
     console.log('✅ Acceso permitido:', user.email, '| Rol:', user.rol);
-  }, [user, isAuthenticated, isInitialized, allowedRoles, router]);
+  }, [isInitialized, isAuthenticated]); 
+  // ✅ user, allowedRoles y router son estables, no causan re-renders
 
   // Mostrar loader mientras inicializa
   if (!isInitialized) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 to-teal-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-teal-50">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
           <p className="text-slate-600 font-medium">Verificando sesión...</p>
@@ -56,11 +59,17 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     );
   }
 
-  // Si no autenticado o sin permisos, no mostrar nada
-  if (!isAuthenticated || !user || (allowedRoles && !allowedRoles.includes(user.rol.toLowerCase() as UserRole))) {
+  // Si no autenticado o sin permisos, no mostrar nada (ya se redirigió)
+  if (!isAuthenticated || !user) {
     return null;
   }
 
-  // Mostrar contenido protegido
+  if (allowedRoles && allowedRoles.length > 0) {
+    const normalizedRole = user.rol.toLowerCase() as UserRole;
+    if (!allowedRoles.includes(normalizedRole)) {
+      return null;
+    }
+  }
+
   return <>{children}</>;
 }

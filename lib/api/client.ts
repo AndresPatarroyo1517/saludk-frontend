@@ -6,56 +6,30 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Enviar cookies automáticamente
-  timeout: 15000, // 15 segundos timeout
+  withCredentials: true,
+  timeout: 15000,
 });
 
-// Estado del refresh
+// ✅ SIMPLIFICADO - Sin colas ni complejidad innecesaria
 let isRefreshing = false;
 let refreshPromise: Promise<void> | null = null;
 
-// Cola de requests fallidas
-interface FailedRequest {
-  resolve: (value?: any) => void;
-  reject: (error?: any) => void;
-}
-let failedQueue: FailedRequest[] = [];
-
-const processQueue = (error: any = null) => {
-  failedQueue.forEach(promise => {
-    if (error) {
-      promise.reject(error);
-    } else {
-      promise.resolve();
-    }
-  });
-  
-  failedQueue = [];
-};
-
-// Request interceptor
 apiClient.interceptors.request.use(
-  (config) => {
-    // Las cookies httpOnly se envían automáticamente con withCredentials: true
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (config) => config,
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - CORREGIDO
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<any>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Si no es 401, rechazar directamente
+    // ✅ No es 401, rechazar directamente
     if (error.response?.status !== 401) {
       return Promise.reject(error);
     }
 
-    // Si ya reintentamos, no volver a intentar
+    // ✅ Ya reintentamos, limpiar auth y redirigir
     if (originalRequest._retry) {
       useAuthStore.getState().clearAuth();
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
@@ -64,7 +38,7 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Si es el endpoint de refresh el que falló, limpiar auth
+    // ✅ Si el refresh falló, limpiar auth
     if (originalRequest.url?.includes('/login/refresh')) {
       useAuthStore.getState().clearAuth();
       if (typeof window !== 'undefined') {
@@ -73,33 +47,30 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Si el error tiene código TOKEN_EXPIRED, intentar refresh
     const errorCode = error.response?.data?.code;
     
+    // ✅ Solo intentar refresh si es TOKEN_EXPIRED
     if (errorCode === 'TOKEN_EXPIRED') {
-      // Si ya estamos refrescando, esperar a que termine
+      originalRequest._retry = true;
+
+      // ✅ Si ya estamos refrescando, esperar
       if (isRefreshing && refreshPromise) {
         try {
           await refreshPromise;
-          // Refresh exitoso, reintentar request original
           return apiClient(originalRequest);
         } catch (refreshError) {
           return Promise.reject(refreshError);
         }
       }
 
-      // Marcar request original como reintentada
-      originalRequest._retry = true;
-      
-      // Iniciar proceso de refresh
+      // ✅ Iniciar refresh
       isRefreshing = true;
-      
       refreshPromise = apiClient.post('/login/refresh')
         .then(() => {
-          processQueue(); // Resolver todos los requests en cola
+          console.log('✅ Token refrescado exitosamente');
         })
         .catch((refreshError) => {
-          processQueue(refreshError); // Rechazar todos los requests en cola
+          console.error('❌ Error al refrescar token:', refreshError);
           useAuthStore.getState().clearAuth();
           if (typeof window !== 'undefined') {
             window.location.href = '/login';
@@ -113,19 +84,16 @@ apiClient.interceptors.response.use(
 
       try {
         await refreshPromise;
-        // Refresh exitoso, reintentar request original
         return apiClient(originalRequest);
       } catch (refreshError) {
         return Promise.reject(refreshError);
       }
-    } 
-    
-    // Otros errores 401 (token inválido, permisos, etc.)
-    if (errorCode === 'NOT_AUTHENTICATED' || errorCode === 'MISSING_REFRESH_TOKEN') {
-      useAuthStore.getState().clearAuth();
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
-      }
+    }
+
+    // ✅ Otros errores 401
+    useAuthStore.getState().clearAuth();
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
     }
 
     return Promise.reject(error);

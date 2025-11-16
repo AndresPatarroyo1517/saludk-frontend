@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
@@ -38,28 +38,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { user, clearAuth, setAuth } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
   const hideHeaderTitle = pathname?.startsWith('/dashboard/citas');
 
-  useEffect(() => {
-    if (!user) {
-      loginService.me()
-        .then(res => {
-          if (res.usuario) {
-            setAuth(res.usuario); // Marca isInitialized: true
-          } else {
-            clearAuth();       // También marca isInitialized: true internamente
-          }
-        })
-        .catch(() => clearAuth());
-    }
-  }, [user, setAuth, clearAuth]);
+  // ✅ ELIMINADO - useAuth() ya maneja la verificación inicial
+  // No necesitamos verificar user aquí, ProtectedRoute ya lo hace
 
   const handleLogout = async () => {
     try {
       await loginService.logout();
     } catch (e) {
-
       console.error('Error en logout:', e);
     }
 
@@ -67,13 +55,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     router.replace('/login');
   };
 
+  // ✅ Si no hay user, ProtectedRoute redirigirá, así que esto nunca se ejecutará
   if (!user) {
-    // Opcional: mostrar un loader mientras se inicializa el user
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-500">Cargando...</p>
-      </div>
-    );
+    return null;
   }
 
   const pacienteLinks: NavLink[] = [
@@ -95,7 +79,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   let links: NavLink[] = [];
   if (user?.rol) {
     const normalizedRole = user.rol.toLowerCase() as UserRole;
-    console.log(`Del dashboard ${normalizedRole}`);
     switch (normalizedRole) {
       case 'director_medico':
         links = directorLinks;
@@ -103,15 +86,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       case 'paciente':
         links = pacienteLinks;
         break;
-      // case 'medico':
-      //   links = medicoLinks;
-      //   break;
       default:
         links = [];
         break;
     }
-  } else {
-    console.log(`No hay rol`);
   }
 
   return (
@@ -133,7 +111,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-6 border-b">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-400 rounded-lg flex items-center justify-center">
                 <Stethoscope className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-slate-800">SaludK</span>
