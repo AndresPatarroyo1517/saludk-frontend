@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CreditCard, Building2, FileText, Check, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type MetodoPago = 'TARJETA' | 'PASARELA' | 'CONSIGNACION';
+type MetodoPago = 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';
 
 interface MetodoPagoSelectorProps {
   onSelect: (metodo: MetodoPago) => void;
@@ -14,7 +14,7 @@ interface MetodoPagoSelectorProps {
 
 const metodosPago = [
   {
-    id: 'TARJETA' as MetodoPago,
+    id: 'TARJETA_CREDITO' as MetodoPago,
     nombre: 'Tarjeta de Crédito/Débito',
     descripcion: 'Pago inmediato con Stripe',
     icon: CreditCard,

@@ -75,6 +75,8 @@ export default function MisCitasPage() {
 
   // Modal/agendamiento state
   const [open, setOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingCitaId, setEditingCitaId] = useState<string | null>(null);
   const [medicos, setMedicos] = useState<any[]>([]);
   const [selectedMedicoId, setSelectedMedicoId] = useState<string>('');
   const [fecha, setFecha] = useState<string>('');
@@ -322,6 +324,19 @@ export default function MisCitasPage() {
   const openDetails = (cita: any) => {
     setDetalleCita(cita);
     setDetailsOpen(true);
+  };
+
+  const startReprogram = (cita: any) => {
+    // Prefill form with existing cita values and open modal in edit mode
+    setIsEditing(true);
+    setEditingCitaId(String(cita.id));
+    setSelectedMedicoId(cita.medico?.id || cita.medico_id || '');
+    setMotivo(cita.motivo_consulta || '');
+    setDuracion(cita.duracion_minutos || 30);
+    setModalidad(cita.modalidad || 'VIRTUAL');
+    // try to set selectedSlot if backend returns same format
+    setSelectedSlot(cita.fecha_hora ? { fecha_hora_inicio: cita.fecha_hora } : null);
+    setOpen(true);
   };
 
   // Helpers de filtrado
@@ -590,14 +605,27 @@ export default function MisCitasPage() {
       };
 
       console.log('📤 Enviando payload:', payload);
-      const resp = await citasService.crearCita(payload);
-      console.log('✅ Cita creada:', resp);
-      toast({
-        title: "¡Cita creada exitosamente!",
-        description: "Tu cita médica ha sido agendada correctamente.",
-        className: "bg-emerald-50 border-emerald-200 text-emerald-900",
-      });
+      let resp: any = null;
+      if (isEditing && editingCitaId) {
+        resp = await citasService.reprogramarCita(editingCitaId, payload);
+        console.log('✅ Cita reprogramada:', resp);
+        toast({
+          title: "¡Cita reprogramada!",
+          description: "La cita ha sido reprogramada correctamente.",
+          className: "bg-emerald-50 border-emerald-200 text-emerald-900",
+        });
+      } else {
+        resp = await citasService.crearCita(payload);
+        console.log('✅ Cita creada:', resp);
+        toast({
+          title: "¡Cita creada exitosamente!",
+          description: "Tu cita médica ha sido agendada correctamente.",
+          className: "bg-emerald-50 border-emerald-200 text-emerald-900",
+        });
+      }
       setOpen(false);
+      setIsEditing(false);
+      setEditingCitaId(null);
       // reset modal
       setSelectedMedicoId(''); setFecha(''); setSelectedSlot(null); setMotivo(''); setProximosSlots([]); setModalidad('VIRTUAL'); setDuracion(30);
       // refrescar lista
@@ -685,8 +713,8 @@ export default function MisCitasPage() {
 
                 <DialogContent className="bg-white text-slate-900 max-w-2xl">
                   <DialogHeader>
-                    <DialogTitle className="text-slate-900">Agendar Nueva Cita</DialogTitle>
-                    <DialogDescription className="text-slate-600">Selecciona médico, fecha y horario para reservar tu cita.</DialogDescription>
+                    <DialogTitle className="text-slate-900">{isEditing ? 'Reprogramar Cita' : 'Agendar Nueva Cita'}</DialogTitle>
+                    <DialogDescription className="text-slate-600">{isEditing ? 'Selecciona médico, fecha y horario para reprogramar tu cita.' : 'Selecciona médico, fecha y horario para reservar tu cita.'}</DialogDescription>
                   </DialogHeader>
 
                   <div className="space-y-3 mt-2">
@@ -763,7 +791,7 @@ export default function MisCitasPage() {
                   </div>
 
                   <DialogFooter>
-                    <Button onClick={confirmarReserva} disabled={!selectedSlot || busy}>{busy ? 'Reservando...' : 'Reservar Cita'}</Button>
+                    <Button onClick={confirmarReserva} disabled={!selectedSlot || busy}>{busy ? (isEditing ? 'Reprogramando...' : 'Reservando...') : (isEditing ? 'Reprogramar Cita' : 'Reservar Cita')}</Button>
                     <DialogClose asChild>
                       <Button className="bg-blue-600 text-white hover:bg-blue-700">Cerrar</Button>
                     </DialogClose>
@@ -851,15 +879,33 @@ export default function MisCitasPage() {
                 const especialidad = c.medico?.especialidad || c.medico?.especialidad_nombre || '';
 
                 const estado = String(c.estado || c.estado_cita || '').toUpperCase();
+                const esCompletada = estado === 'COMPLETADA' || estado === 'FINALIZADA' || estado === 'REALIZADA' || estado === 'ATENDIDA';
+
                 const estadoClasses = estado === 'CONFIRMADA'
                   ? 'bg-emerald-50 text-emerald-700'
                   : estado === 'AGENDADA'
                     ? 'bg-blue-50 text-blue-700'
                     : estado === 'CANCELADA'
                       ? 'bg-rose-50 text-rose-700'
-                      : 'bg-slate-100 text-slate-600';
-                const badgeBg = estado === 'CONFIRMADA' ? 'bg-emerald-50' : estado === 'CANCELADA' ? 'bg-rose-50' : 'bg-blue-50';
-                const badgeText = estado === 'CONFIRMADA' ? 'text-emerald-600' : estado === 'CANCELADA' ? 'text-rose-600' : 'text-blue-600';
+                      : esCompletada
+                        ? 'bg-amber-50 text-amber-800'
+                        : 'bg-slate-100 text-slate-600';
+
+                const badgeBg = estado === 'CONFIRMADA'
+                  ? 'bg-emerald-50'
+                  : estado === 'CANCELADA'
+                    ? 'bg-rose-50'
+                    : esCompletada
+                      ? 'bg-amber-50'
+                      : 'bg-blue-50';
+
+                const badgeText = estado === 'CONFIRMADA'
+                  ? 'text-emerald-600'
+                  : estado === 'CANCELADA'
+                    ? 'text-rose-600'
+                    : esCompletada
+                      ? 'text-amber-700'
+                      : 'text-blue-600';
 
                 return (
                   <div key={c.id} className="flex items-center justify-between bg-white border border-slate-100 rounded-lg p-4 shadow-sm">
@@ -879,22 +925,28 @@ export default function MisCitasPage() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <div>
-                        <span className={`px-3 py-1 rounded-full text-sm ${estadoClasses}`}>{estado || 'DESCONOCIDO'}</span>
-                      </div>
-
                       <div className="flex items-center gap-3">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => openDetails(c)}
-                          className="bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-                        >
-                          Ver Detalles
-                        </Button>
+                        <div className="self-center">
+                          <span className={`px-3 py-1 rounded-full text-sm ${estadoClasses}`}>{(estado && (estado.charAt(0) + estado.slice(1).toLowerCase())) || 'Desconocido'}</span>
+                        </div>
 
-                        {(estado === 'AGENDADA' || estado === 'CONFIRMADA') && (
-                          <button onClick={() => openCancelDialog(c.id)} className="text-sm text-rose-600">Cancelar</button>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => openDetails(c)}
+                            className="bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                          >
+                            Ver Detalles
+                          </Button>
+
+                          {estado === 'AGENDADA' && (
+                            <button onClick={() => openCancelDialog(c.id)} className="text-sm text-rose-600">Cancelar</button>
+                          )}
+
+                          {estado === 'CONFIRMADA' && (
+                            <button onClick={() => startReprogram(c)} className="text-sm text-indigo-600">Reprogramar</button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1017,9 +1069,15 @@ export default function MisCitasPage() {
               )}
 
               <DialogFooter>
-                {detalleCita && (String(detalleCita.estado || detalleCita.estado_cita).toUpperCase() === 'AGENDADA' || String(detalleCita.estado || detalleCita.estado_cita).toUpperCase() === 'CONFIRMADA') && (
+                {detalleCita && String(detalleCita.estado || detalleCita.estado_cita).toUpperCase() === 'AGENDADA' && (
                   <Button variant="destructive" onClick={() => { if (detalleCita) { setCitaToCancel(String(detalleCita.id)); setCancelDialogOpen(true); } }}>
                     Cancelar Cita
+                  </Button>
+                )}
+
+                {detalleCita && String(detalleCita.estado || detalleCita.estado_cita).toUpperCase() === 'CONFIRMADA' && (
+                  <Button variant="default" onClick={() => { if (detalleCita) startReprogram(detalleCita); }}>
+                    Reprogramar
                   </Button>
                 )}
                 <DialogClose asChild>

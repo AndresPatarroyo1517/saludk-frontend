@@ -5,26 +5,70 @@ export interface OrdenPago {
     tipo_orden: 'SUSCRIPCION' | 'COMPRA' | 'CITA';
     paciente_id: string;
     monto: number;
-    metodo_pago: 'TARJETA' | 'PASARELA' | 'CONSIGNACION';
+    metodo_pago: 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION' | null;
     estado: 'PENDIENTE' | 'COMPLETADO' | 'FALLIDO' | 'CANCELADO';
     referencia_transaccion?: string;
     fecha_creacion: string;
 }
 
+// ✅ Request para CREAR suscripción (sin método de pago aún)
 export interface CrearSuscripcionRequest {
     planId: string;
-    metodoPago: 'TARJETA' | 'PSE' | 'CONSIGNACION';
+    metodoPago: 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';
 }
 
+// ✅ Response al crear suscripción (solo info básica)
 export interface CrearSuscripcionResponse {
     success: boolean;
     message: string;
     data: {
-        suscripcion: any;
-        ordenPago: OrdenPago;
-        stripe?: {
+        suscripcion: {
             id: string;
-            client_secret: string;
+            plan_id: string;
+            plan_nombre: string;
+            plan_codigo: string;
+            estado: string;
+            fecha_inicio: string;
+            fecha_vencimiento: string;
+            monto: number;
+        };
+        ordenPago: {
+            id: string;
+            estado: string;
+            monto: number;
+            metodo_pago: string;
+        };
+    };
+}
+
+// ✅ Request para PROCESAR pago (con método elegido)
+export interface ProcesarPagoSuscripcionRequest {
+    suscripcionId: string;
+    metodoPago: 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';
+}
+
+// ✅ Response al procesar pago (con datos según método)
+export interface ProcesarPagoSuscripcionResponse {
+    success: boolean;
+    message?: string;
+    data: {
+        data: {
+          ordenPago: {
+            id: string;
+            estado: string;
+            monto: number;
+            metodo_pago: string;
+          }; stripe?: { clientSecret: string; paymentIntentId: string; status: string; amount_usd: number; amount_cop: number; } | undefined; pse?: { referencia: string; mensaje: string; } | undefined; consignacion?: { referencia: string; banco: string; tipo_cuenta: string; numero_cuenta: string; titular: string; nit: string; monto: number; instrucciones: string; } | undefined;
+        };
+        ordenPago: {
+            id: string;
+            estado: string;
+            monto: number;
+            metodo_pago: string;
+        };
+        stripe?: {
+            clientSecret: string;
+            paymentIntentId: string;
             status: string;
             amount_usd: number;
             amount_cop: number;
@@ -34,19 +78,21 @@ export interface CrearSuscripcionResponse {
             mensaje: string;
         };
         consignacion?: {
-            mensaje: string;
+            referencia: string;
             banco: string;
-            numeroCuenta: string;
+            tipo_cuenta: string;
+            numero_cuenta: string;
+            titular: string;
+            nit: string;
             monto: number;
-            codigoReferencia: string;
-            nota: string;
+            instrucciones: string;
         };
     };
 }
 
 export interface ProcesarCompraRequest {
     items: Array<{ productId: string; cantidad: number }>;
-    metodoPago: 'TARJETA' | 'PASARELA' | 'CONSIGNACION';
+    metodoPago: 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';
     direccion_entrega_id: string;
     codigoPromocion?: string;
 }
@@ -83,16 +129,16 @@ export interface ProcesarCompraResponse {
 }
 
 export const pagoService = {
-    // Crear suscripción con orden de pago
+    // ✅ PASO 1: Crear suscripción (sin método de pago)
     crearSuscripcion: async (data: CrearSuscripcionRequest): Promise<CrearSuscripcionResponse> => {
         const response = await apiClient.post('/suscripcion', data);
         return response.data;
     },
 
-    procesarPagoSuscripcion: async (data: {
-        suscripcionId: string;
-        metodoPago: 'TARJETA' | 'PASARELA' | 'CONSIGNACION';
-    }) => {
+    // ✅ PASO 2: Procesar pago de suscripción (con método elegido)
+    procesarPagoSuscripcion: async (
+        data: ProcesarPagoSuscripcionRequest
+    ): Promise<ProcesarPagoSuscripcionResponse> => {
         const response = await apiClient.post('/suscripcion/pago', data);
         return response.data;
     },
@@ -116,16 +162,14 @@ export const pagoService = {
     },
 
     // Subir comprobante de consignación
-    subirComprobante: async (ordenId: string, comprobanteUrl: string) => {
-        const response = await apiClient.post(`/pagos/subir-comprobante/${ordenId}`, {
-            comprobanteUrl
-        });
+    subirComprobante: async (ordenId: string) => {
+        const response = await apiClient.post(`/pagos/subir-comprobante/${ordenId}`);
         return response.data;
     },
 
     // Simular pago PSE (desarrollo)
-    simularPSE: async (ordenId: string, exito: boolean = true) => {
-        const response = await apiClient.post(`/pagos/simular-pse/${ordenId}`, { exito });
+    simularPSE: async (ordenId: string) => {
+        const response = await apiClient.post(`/pagos/simular-pse/${ordenId}`);
         return response.data;
     },
 

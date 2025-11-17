@@ -6,24 +6,130 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
-import { Calendar, ShoppingBag, FileText, CreditCard, AlertCircle, CheckCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { 
+  Calendar, 
+  ShoppingBag, 
+  FileText, 
+  CreditCard, 
+  AlertCircle, 
+  CheckCircle,
+  Loader2 
+} from 'lucide-react';
+
+interface DashboardStats {
+  proximasCitas: number;
+  historialItems: number;
+  ordenesRecientes: number;
+  tienePlanActivo: boolean;
+  planNombre: string | null;
+  consultasVirtualesDisponibles: number;
+  consultasPresencialesDisponibles: number;
+}
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
-  const router = useRouter();
-  const [stats, setStats] = useState({
+  const { user, fetchUserData, isLoading, error } = useAuthStore();
+  const [stats, setStats] = useState<DashboardStats>({
     proximasCitas: 0,
     historialItems: 0,
     ordenesRecientes: 0,
+    tienePlanActivo: false,
+    planNombre: null,
+    consultasVirtualesDisponibles: 0,
+    consultasPresencialesDisponibles: 0
   });
 
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        // Solo hacer fetch si no hay usuario cargado
+        if (!user) {
+          await fetchUserData();
+        }
+      } catch (error) {
+        console.error('Error cargando datos del dashboard:', error);
+      }
+    };
+
+    loadDashboardData();
+  }, []); // Solo ejecutar una vez al montar
+
+  useEffect(() => {
+    // Calcular estadísticas cuando el usuario cambie
+    if (user) {
+      const proximasCitas = user.proximas_citas?.length || 0;
+      
+      const historialItems = user.historial_medico
+        ? (user.historial_medico.enfermedades_cronicas?.length || 0) +
+          (user.historial_medico.cirugias_previas?.length || 0) +
+          (user.historial_medico.medicamentos_actuales?.length || 0)
+        : 0;
+      
+      const ordenesRecientes = user.ordenes_pago?.length || 0;
+      const tienePlanActivo = !!user.plan_activo;
+      const planNombre = user.plan_activo?.plan?.nombre || null;
+      
+      const consultasVirtualesDisponibles = 
+        user.plan_activo?.consultas_virtuales?.disponibles || 0;
+      const consultasPresencialesDisponibles = 
+        user.plan_activo?.consultas_presenciales?.disponibles || 0;
+
+      setStats({
+        proximasCitas,
+        historialItems,
+        ordenesRecientes,
+        tienePlanActivo,
+        planNombre,
+        consultasVirtualesDisponibles,
+        consultasPresencialesDisponibles
+      });
+    }
+  }, [user]);
+
+  // Estado de carga
+  if (isLoading) {
+    return (
+      <ProtectedRoute allowedRoles={['paciente']}>
+        <DashboardLayout>
+          <div className="space-y-6">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              <h2 className="text-xl font-semibold">Cargando dashboard...</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          </div>
+        </DashboardLayout>
+      </ProtectedRoute>
+    );
+  }
+
+  // Estado de error
+  if (error) {
+    return (
+      <ProtectedRoute allowedRoles={['paciente']}>
+        <DashboardLayout>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Error al cargar el dashboard: {error}
+            </AlertDescription>
+          </Alert>
+        </DashboardLayout>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute allowedRoles={['paciente']}>
       <DashboardLayout>
         <div className="space-y-6">
+          {/* Encabezado */}
           <div>
             <h1 className="text-3xl font-bold text-slate-800">
               Bienvenido, {user?.datos_personales?.nombres || 'Usuario'}
@@ -33,24 +139,8 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {user?.estado === 'pendiente' && (
-            <Card className="border-yellow-200 bg-yellow-50">
-              <CardHeader>
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                  <div>
-                    <CardTitle className="text-yellow-800">Registro en Revisión</CardTitle>
-                    <CardDescription className="text-yellow-700">
-                      Tu solicitud de registro está siendo revisada por nuestro equipo médico.
-                      Te notificaremos por email cuando sea aprobada.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-          )}
-
-          {user?.estado === 'aprobado' && !user?.plan && (
+          {/* Alerta si no tiene plan activo */}
+          {!stats.tienePlanActivo && (
             <Card className="border-blue-200 bg-blue-50">
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -71,6 +161,7 @@ export default function DashboardPage() {
             </Card>
           )}
 
+          {/* Cards de estadísticas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -105,7 +196,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold capitalize">
-                  {user?.plan || 'Ninguno'}
+                  {stats.planNombre || 'Ninguno'}
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
                   Tu suscripción actual
@@ -127,6 +218,33 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {/* Información del plan activo */}
+          {stats.tienePlanActivo && (
+            <Card className="border-green-200 bg-green-50">
+              <CardHeader>
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div className="flex-1">
+                    <CardTitle className="text-green-800">Plan Activo: {stats.planNombre}</CardTitle>
+                    <CardDescription className="text-green-700 mt-2">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="font-medium">Consultas Virtuales:</span>{' '}
+                          {stats.consultasVirtualesDisponibles} disponibles
+                        </div>
+                        <div>
+                          <span className="font-medium">Consultas Presenciales:</span>{' '}
+                          {stats.consultasPresencialesDisponibles} disponibles
+                        </div>
+                      </div>
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          )}
+
+          {/* Acciones rápidas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -186,34 +304,20 @@ export default function DashboardPage() {
                 </div>
                 <CardTitle>Planes de Suscripción</CardTitle>
                 <CardDescription>
-                  {user?.plan ? 'Gestiona tu plan actual o cámbialo' : 'Suscríbete a un plan para acceder a todos los servicios'}
+                  {stats.tienePlanActivo 
+                    ? 'Gestiona tu plan actual o cámbialo' 
+                    : 'Suscríbete a un plan para acceder a todos los servicios'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Link href="/dashboard/planes">
                   <Button className="w-full" variant="outline">
-                    {user?.plan ? 'Gestionar Plan' : 'Ver Planes'}
+                    {stats.tienePlanActivo ? 'Gestionar Plan' : 'Ver Planes'}
                   </Button>
                 </Link>
               </CardContent>
             </Card>
           </div>
-
-          {user?.estado === 'aprobado' && user?.plan && (
-            <Card className="border-green-200 bg-green-50">
-              <CardHeader>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <div>
-                    <CardTitle className="text-green-800">Cuenta Activa</CardTitle>
-                    <CardDescription className="text-green-700">
-                      Tu cuenta está completamente configurada. Ahora puedes acceder a todos nuestros servicios.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-          )}
         </div>
       </DashboardLayout>
     </ProtectedRoute>
