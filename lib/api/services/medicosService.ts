@@ -49,6 +49,11 @@ export const medicosService = {
     return response.data;
   },
 
+/*   getCitasMedico: async (medicoId: string | number) => {
+    const response = await apiClient.get(`/citas/medico/${medicoId}`);
+    return response.data;
+  }, */
+
   getEstadisticasMedico: async (medicoId: string | number): Promise<EstadisticasMedicoResponse> => {
     console.log(`ID MEDICO: ${medicoId}`);
     const response = await apiClient.get(`/citas/medico/${medicoId}/estadisticas`);
