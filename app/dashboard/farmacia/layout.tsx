@@ -5,7 +5,7 @@ import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { ProductsProvider } from '@/lib/productsContext';
 
 export const metadata = {
-    title: 'Dashboard OROCRUZ',
+    title: 'Farmacia',
     description: 'Gestión de farmacia',
 };
 

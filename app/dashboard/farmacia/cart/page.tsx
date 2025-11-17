@@ -19,7 +19,9 @@ import {
   Copy,
   FileText,
   Package,
-  PartyPopper
+  PartyPopper,
+  CreditCard,
+  Building
 } from 'lucide-react';
 import { toast } from 'sonner';
 import MetodoPagoSelector from '@/components/checkout/MetodoPagoSelector';
@@ -27,7 +29,7 @@ import StripeCheckout from '@/components/checkout/StripeCheckout';
 import pagoService from '@/lib/api/services/pagoService';
 import { useAuthStore } from '@/lib/store/authStore';
 
-type MetodoPago = 'TARJETA_CREDITO'  | 'PASARELA' | 'CONSIGNACION';
+type MetodoPago = 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';
 type Step = 'carrito' | 'direccion' | 'pago' | 'confirmacion' | 'exito';
 
 export default function CartPage() {
@@ -65,7 +67,7 @@ export default function CartPage() {
   const calcularTotal = () => {
     const subtotal = calcularSubtotal();
     const descuento = promocionAplicada ? promocionAplicada.descuentoAplicado : 0;
-    return subtotal - descuento;
+    return Math.max(subtotal - descuento, 0);
   };
 
   const formatPrice = (value: number) => {
@@ -108,7 +110,7 @@ export default function CartPage() {
       });
       
       toast.success('¡Código aplicado!', {
-        description: `Descuento de ${formatPrice(descuento)} COP`,
+        description: `Descuento de ${formatPrice(descuento)} aplicado`,
       });
     } catch (error) {
       toast.error('Código inválido o expirado');
@@ -119,12 +121,12 @@ export default function CartPage() {
 
   const confirmarCompraEnBackend = async (compraId: string) => {
     try {
-      console.log('🟢 [CONFIRMACIÓN] Confirmando compra:', compraId);
+      console.log('🟢 Confirmando compra:', compraId);
       const response = await pagoService.confirmarCompra(compraId);
-      console.log('✅ [CONFIRMACIÓN] Compra confirmada:', response);
+      console.log('✅ Compra confirmada:', response);
       return true;
     } catch (error: any) {
-      console.error('❌ [CONFIRMACIÓN] Error:', error);
+      console.error('❌ Error confirmando compra:', error);
       toast.error('Error al confirmar la compra', {
         description: error.response?.data?.error || error.message,
       });
@@ -138,7 +140,7 @@ export default function CartPage() {
       return;
     }
 
-    console.log('🟢 [PASO 1] Creando compra con método:', metodoPago);
+    console.log('🟢 Creando compra con método:', metodoPago);
     setLoading(true);
 
     try {
@@ -154,7 +156,7 @@ export default function CartPage() {
         codigoPromocion: promocionAplicada?.codigo,
       });
 
-      console.log('✅ [PASO 1] Compra creada:', response);
+      console.log('✅ Compra creada:', response);
 
       const responseData = response.data || response;
       
@@ -170,12 +172,12 @@ export default function CartPage() {
       setPagoData(responseData.ordenPago);
       setStep('confirmacion');
       
-      toast.success('Compra creada', {
-        description: 'Procede con el pago',
+      toast.success('Compra creada exitosamente', {
+        description: 'Procede con el pago para completar tu pedido',
       });
 
     } catch (error: any) {
-      console.error('❌ [PASO 1] Error:', error);
+      console.error('❌ Error creando compra:', error);
       toast.error('Error al crear la compra', {
         description: error.response?.data?.error || error.message,
       });
@@ -185,12 +187,12 @@ export default function CartPage() {
   };
 
   const handlePagoExitoso = async () => {
-    console.log('🟢 [PAGO EXITOSO] Orden:', ordenId);
+    console.log('🟢 Pago exitoso para orden:', ordenId);
     
     try {
       // Confirmar la compra en el backend para tarjeta
-      if (compraData?.compra?.id) {
-        const confirmado = await confirmarCompraEnBackend(compraData.compra.id);
+      if (compraData?.id) {
+        const confirmado = await confirmarCompraEnBackend(compraData.id);
         if (!confirmado) {
           console.warn('⚠️ Compra no confirmada en backend, pero continuando...');
         }
@@ -199,7 +201,7 @@ export default function CartPage() {
       setStep('exito');
       
       toast.success('¡Compra completada!', {
-        description: 'Tu pedido ha sido procesado',
+        description: 'Tu pedido ha sido procesado exitosamente',
         icon: <CheckCircle className="w-5 h-5" />,
       });
 
@@ -207,7 +209,7 @@ export default function CartPage() {
       dispatch({ type: 'CLEAR' });
 
     } catch (error) {
-      console.error('❌ [PAGO EXITOSO] Error:', error);
+      console.error('❌ Error en pago exitoso:', error);
       toast.error('Error al procesar la compra', {
         description: 'Contacta a soporte si el problema persiste',
       });
@@ -221,34 +223,52 @@ export default function CartPage() {
   };
 
   const handleConfirmarYRedirigir = async () => {
-    if (compraData?.compra?.id) {
-      const confirmado = await confirmarCompraEnBackend(compraData.compra.id);
+    if (compraData?.id) {
+      const confirmado = await confirmarCompraEnBackend(compraData.id);
       if (confirmado) {
-        toast.success('Compra confirmada');
+        toast.success('Compra confirmada exitosamente');
       }
     }
     router.push('/dashboard/mis-compras');
   };
 
-  const copiarTexto = (texto: string, label: string) => {
-    navigator.clipboard.writeText(texto);
-    toast.success(`${label} copiado al portapapeles`);
+  // Renderizar formulario de Stripe condicionalmente
+  const renderStripeForm = () => {
+    if (metodoPago === 'TARJETA_CREDITO' && pagoData?.stripe) {
+      return (
+        <StripeCheckout
+          clientSecret={pagoData.stripe.clientSecret}
+          monto={pagoData.stripe.amount_usd}
+          montoCOP={compraData?.total || calcularTotal()}
+          onSuccess={handlePagoExitoso}
+          onError={handlePagoError}
+          descripcion="Compra de productos farmacéuticos"
+        />
+      );
+    }
+    return null;
   };
 
   if (items.length === 0 && step !== 'exito') {
     return (
-      <main className="min-h-screen bg-slate-50">
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <Header />
-        <div className="max-w-2xl mx-auto text-center py-12 px-4">
-          <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+        <div className="max-w-2xl mx-auto text-center py-16 px-4">
+          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <ShoppingCart className="w-12 h-12 text-slate-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-slate-800 mb-3">
             Tu carrito está vacío
           </h2>
-          <p className="text-slate-600 mb-6">
-            Agrega productos para comenzar tu compra
+          <p className="text-slate-600 mb-8 text-lg">
+            Descubre nuestros productos y comienza tu compra
           </p>
-          <Button onClick={() => router.push('/dashboard/farmacia')}>
-            Ver productos
+          <Button 
+            onClick={() => router.push('/dashboard/farmacia')}
+            size="lg"
+            className="px-8 py-3 text-base"
+          >
+            Explorar Productos
           </Button>
         </div>
       </main>
@@ -256,162 +276,225 @@ export default function CartPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Header />
       
-      <div className="max-w-6xl mx-auto space-y-6 p-6">
-        {/* Header */}
-        <div>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (step === 'carrito') router.push('/dashboard/farmacia');
-              else if (step === 'direccion') setStep('carrito');
-              else if (step === 'pago') setStep('direccion');
-              else if (step === 'confirmacion') setStep('pago');
-            }}
-            className="mb-4"
-            disabled={step === 'exito'}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver
-          </Button>
-          <h1 className="text-3xl font-bold text-slate-800">
-            {step === 'carrito' && 'Carrito de Compras'}
-            {step === 'direccion' && 'Dirección de Entrega'}
-            {step === 'pago' && 'Método de Pago'}
-            {step === 'confirmacion' && 'Confirmar Pago'}
-            {step === 'exito' && '¡Compra Exitosa!'}
-          </h1>
+      <div className="max-w-7xl mx-auto space-y-8 p-6">
+        {/* Header con navegación */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (step === 'carrito') router.push('/dashboard/farmacia');
+                  else if (step === 'direccion') setStep('carrito');
+                  else if (step === 'pago') setStep('direccion');
+                  else if (step === 'confirmacion') setStep('pago');
+                }}
+                className="hover:bg-slate-100 transition-colors"
+                disabled={step === 'exito'}
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Volver
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-800 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                  {step === 'carrito' && 'Carrito de Compras'}
+                  {step === 'direccion' && 'Dirección de Entrega'}
+                  {step === 'pago' && 'Método de Pago'}
+                  {step === 'confirmacion' && 'Confirmar Pago'}
+                  {step === 'exito' && '¡Compra Exitosa!'}
+                </h1>
+                <p className="text-slate-500 mt-1">
+                  {step === 'carrito' && 'Revisa y gestiona tus productos'}
+                  {step === 'direccion' && 'Selecciona donde recibirás tu pedido'}
+                  {step === 'pago' && 'Elige cómo quieres pagar'}
+                  {step === 'confirmacion' && 'Completa tu compra'}
+                  {step === 'exito' && 'Tu pedido está en proceso'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full">
+              <Package className="w-5 h-5 text-slate-600" />
+              <span className="text-sm font-medium text-slate-700">
+                {items.length} producto{items.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Indicador de pasos */}
+        {/* Indicador de pasos mejorado */}
         {step !== 'exito' && (
-          <div className="flex items-center justify-center gap-4 mb-8">
+          <div className="flex items-center justify-center gap-8 mb-8">
             {[
-              { id: 'carrito', label: 'Carrito' },
-              { id: 'direccion', label: 'Dirección' },
-              { id: 'pago', label: 'Pago' },
-              { id: 'confirmacion', label: 'Confirmación' },
-            ].map((paso, idx) => (
-              <div key={paso.id} className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                    step === paso.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  {idx + 1}
+              { id: 'carrito', label: 'Carrito', icon: ShoppingCart },
+              { id: 'direccion', label: 'Dirección', icon: MapPin },
+              { id: 'pago', label: 'Pago', icon: CreditCard },
+              { id: 'confirmacion', label: 'Confirmar', icon: CheckCircle },
+            ].map((paso, idx) => {
+              const Icon = paso.icon;
+              const isActive = step === paso.id;
+              const isCompleted = ['direccion', 'pago', 'confirmacion', 'exito'].indexOf(step) > ['carrito', 'direccion', 'pago', 'confirmacion'].indexOf(paso.id);
+              
+              return (
+                <div key={paso.id} className="flex items-center">
+                  <div className={`flex flex-col items-center transition-all duration-300 ${
+                    isActive ? 'scale-110' : 'scale-100'
+                  }`}>
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-2xl font-semibold border-2 transition-all ${
+                      isActive 
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' 
+                        : isCompleted
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : 'bg-white border-slate-300 text-slate-400'
+                    }`}>
+                      {isCompleted ? (
+                        <CheckCircle className="w-6 h-6" />
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
+                    </div>
+                    <span className={`mt-2 text-sm font-medium transition-colors ${
+                      isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-slate-400'
+                    }`}>
+                      {paso.label}
+                    </span>
+                  </div>
+                  {idx < 3 && (
+                    <div className={`w-16 h-1 mx-4 rounded-full transition-colors ${
+                      isCompleted ? 'bg-green-500' : 'bg-slate-200'
+                    }`} />
+                  )}
                 </div>
-                <span className="ml-2 text-sm font-medium text-slate-700 hidden sm:inline">
-                  {paso.label}
-                </span>
-                {idx < 3 && (
-                  <div className="w-8 sm:w-12 h-0.5 bg-slate-200 mx-2 sm:mx-4" />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           {/* Columna principal */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="xl:col-span-2 space-y-6">
             {/* STEP: Carrito */}
             {step === 'carrito' && (
               <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ShoppingCart className="w-5 h-5" />
-                      Productos ({items.length})
+                <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardHeader className="bg-slate-50 rounded-t-lg border-b">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <ShoppingCart className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-xl">Tu Carrito</div>
+                        <div className="text-sm font-normal text-slate-500">
+                          {items.length} producto{items.length !== 1 ? 's' : ''} agregado{items.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-6 space-y-4">
                     {items.map((item: any) => (
                       <div
                         key={item.id}
-                        className="flex items-center gap-4 p-4 border rounded-lg"
+                        className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors group"
                       >
-                        {item.image ? (
-                          <img src={item.image} alt={item.title} className="w-20 h-20 object-cover rounded" />
-                        ) : (
-                          <div className="w-20 h-20 bg-slate-100 rounded flex items-center justify-center text-slate-400">
-                            Sin imagen
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-800">
+                        <div className="flex-shrink-0">
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.title} 
+                              className="w-20 h-20 object-cover rounded-lg shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                              <Package className="w-8 h-8" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-slate-800 truncate">
                             {item.title}
                           </h4>
-                          <p className="text-sm text-slate-600">
-                            {formatPrice(Number(item.price))} COP
+                          <p className="text-lg font-bold text-blue-600 mt-1">
+                            {formatPrice(Number(item.price))}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 hover:bg-slate-200"
+                              onClick={() => actualizarCantidad(item.id, item.qty - 1)}
+                            >
+                              -
+                            </Button>
+                            <span className="w-8 text-center font-semibold text-slate-800">
+                              {item.qty}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 hover:bg-slate-200"
+                              onClick={() => actualizarCantidad(item.id, item.qty + 1)}
+                            >
+                              +
+                            </Button>
+                          </div>
+                          
                           <Button
                             size="sm"
-                            variant="outline"
-                            onClick={() => actualizarCantidad(item.id, item.qty - 1)}
+                            variant="ghost"
+                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            onClick={() => eliminarProducto(item.id)}
                           >
-                            -
-                          </Button>
-                          <span className="w-8 text-center font-semibold">
-                            {item.qty}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => actualizarCantidad(item.id, item.qty + 1)}
-                          >
-                            +
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => eliminarProducto(item.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </Button>
                       </div>
                     ))}
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-slate-200 shadow-sm">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Tag className="w-5 h-5" />
-                      Código Promocional
+                    <CardTitle className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Tag className="w-5 h-5 text-green-600" />
+                      </div>
+                      <span className="text-slate-800">Código Promocional</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Input
-                        placeholder="Ingresa tu código"
+                        placeholder="Ingresa tu código de descuento"
                         value={codigoPromocion}
                         onChange={(e) => setCodigoPromocion(e.target.value)}
                         disabled={!!promocionAplicada}
+                        className="flex-1"
                       />
                       <Button
                         onClick={aplicarPromocion}
                         disabled={aplicandoPromocion || !!promocionAplicada}
+                        variant={promocionAplicada ? "outline" : "default"}
+                        className="whitespace-nowrap"
                       >
                         {aplicandoPromocion ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Aplicar'
-                        )}
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : null}
+                        {promocionAplicada ? 'Aplicado' : 'Aplicar'}
                       </Button>
                     </div>
                     {promocionAplicada && (
                       <Alert className="mt-4 border-green-200 bg-green-50">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
-                          Código <strong>{promocionAplicada.codigo}</strong> aplicado.
-                          Descuento: {promocionAplicada.porcentaje}%
+                          ¡Descuento del {promocionAplicada.porcentaje}% aplicado! 
+                          Ahorras {formatPrice(promocionAplicada.descuentoAplicado)}
                         </AlertDescription>
                       </Alert>
                     )}
@@ -420,10 +503,10 @@ export default function CartPage() {
 
                 <Button
                   onClick={() => setStep('direccion')}
-                  className="w-full h-12"
+                  className="w-full h-14 text-base font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
                   size="lg"
                 >
-                  Continuar a Dirección
+                  Continuar con la Dirección
                 </Button>
               </>
             )}
@@ -431,21 +514,25 @@ export default function CartPage() {
             {/* STEP: Dirección */}
             {step === 'direccion' && (
               <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5" />
-                      Dirección de Entrega
+                <Card className="border-slate-200 shadow-sm">
+                  <CardHeader className="bg-slate-50 rounded-t-lg border-b">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <MapPin className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-xl">Dirección de Entrega</div>
+                        <div className="text-sm font-normal text-slate-500">
+                          Selecciona dónde quieres recibir tu pedido
+                        </div>
+                      </div>
                     </CardTitle>
-                    <CardDescription>
-                      Selecciona dónde quieres recibir tu pedido
-                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-6 space-y-4">
                     {direcciones.length === 0 ? (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
+                      <Alert className="border-amber-200 bg-amber-50">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800">
                           No tienes direcciones registradas. Por favor, agrega una dirección en tu perfil.
                         </AlertDescription>
                       </Alert>
@@ -453,25 +540,30 @@ export default function CartPage() {
                       direcciones.map((dir: any) => (
                         <div
                           key={dir.id}
-                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                             direccionSeleccionada === dir.id
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-slate-200 hover:border-blue-300'
+                              ? 'border-blue-500 bg-blue-50 shadow-sm'
+                              : 'border-slate-200 hover:border-blue-300 bg-white'
                           }`}
                           onClick={() => setDireccionSeleccionada(dir.id)}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Building className="w-4 h-4 text-slate-400" />
+                                <span className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded">
+                                  {dir.tipo}
+                                </span>
+                              </div>
                               <p className="font-semibold text-slate-800">{dir.direccion_completa}</p>
                               <p className="text-sm text-slate-600 mt-1">
                                 {dir.ciudad}, {dir.departamento}
                               </p>
-                              <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded">
-                                {dir.tipo}
-                              </span>
                             </div>
                             {direccionSeleccionada === dir.id && (
-                              <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                              <div className="flex-shrink-0 ml-4">
+                                <CheckCircle className="w-6 h-6 text-blue-600" />
+                              </div>
                             )}
                           </div>
                         </div>
@@ -482,11 +574,11 @@ export default function CartPage() {
 
                 <Button
                   onClick={() => setStep('pago')}
-                  className="w-full h-12"
+                  className="w-full h-14 text-base font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
                   size="lg"
                   disabled={!direccionSeleccionada}
                 >
-                  Continuar a Pago
+                  {!direccionSeleccionada ? 'Selecciona una dirección' : 'Continuar al Pago'}
                 </Button>
               </>
             )}
@@ -494,104 +586,145 @@ export default function CartPage() {
             {/* STEP: Método de pago */}
             {step === 'pago' && (
               <>
-                <MetodoPagoSelector
-                  metodoPago={metodoPago}
-                  onSelect={(metodo) => setMetodoPago(metodo as MetodoPago)}
-                  disabled={loading}
-                />
+                <Card className="border-slate-200 shadow-sm">
+                  <CardHeader className="bg-slate-50 rounded-t-lg border-b">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <CreditCard className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-xl">Método de Pago</div>
+                        <div className="text-sm font-normal text-slate-500">
+                          Elige cómo quieres pagar tu pedido
+                        </div>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <MetodoPagoSelector
+                      metodoPago={metodoPago}
+                      onSelect={(metodo) => setMetodoPago(metodo as MetodoPago)}
+                      disabled={loading}
+                    />
+                  </CardContent>
+                </Card>
 
                 <Button
                   onClick={handleCrearCompra}
                   disabled={loading}
-                  className="w-full h-12"
+                  className="w-full h-14 text-base font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
                   size="lg"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Procesando...
+                      <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                      Procesando tu compra...
                     </>
                   ) : (
-                    'Continuar al Pago'
+                    `Pagar ${formatPrice(calcularTotal())}`
                   )}
                 </Button>
               </>
             )}
 
-            {/* STEP: Confirmación */}
+            {/* STEP: Confirmación - SOLUCIÓN PARA STRIPE */}
             {step === 'confirmacion' && pagoData && (
-              <>
-                {/* TARJETA: Stripe */}
-                {metodoPago === 'TARJETA_CREDITO' && pagoData.stripe && (
-                  <StripeCheckout
-                    clientSecret={pagoData.stripe.clientSecret}
-                    monto={pagoData.stripe.amount_usd}
-                    montoCOP={compraData.total}
-                    onSuccess={handlePagoExitoso}
-                    onError={handlePagoError}
-                    descripcion="Compra de productos"
-                  />
+              <div className="space-y-6">
+                {/* TARJETA: Stripe - Renderizado condicional mejorado */}
+                {metodoPago === 'TARJETA_CREDITO' && (
+                  <div className="animate-in fade-in duration-500">
+                    {pagoData.stripe ? (
+                      <Card className="border-blue-200 shadow-lg">
+                        <CardHeader className="bg-blue-50 rounded-t-lg border-b border-blue-100">
+                          <CardTitle className="flex items-center gap-3 text-blue-900">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                              <CreditCard className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="text-xl">Pago con Tarjeta</div>
+                              <div className="text-sm font-normal text-blue-700">
+                                Completa los datos de tu tarjeta de crédito/débito
+                              </div>
+                            </div>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                          {renderStripeForm()}
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Alert variant="destructive" className="animate-pulse">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          Error al cargar el formulario de pago. Por favor, intenta de nuevo.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
                 )}
 
-                {/* PSE */}
+                {/* Resto de métodos de pago... */}
                 {metodoPago === 'PASARELA' && pagoData.pse && (
-                  <Card className="border-teal-100 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
+                  <Card className="border-teal-200 shadow-lg">
+                    <CardHeader className="bg-teal-50 rounded-t-lg border-b border-teal-100">
+                      <CardTitle className="flex items-center gap-3 text-teal-900">
                         <CheckCircle className="w-6 h-6 text-teal-600" />
                         Pago PSE en Proceso
                       </CardTitle>
-                      <CardDescription>{pagoData.pse.mensaje}</CardDescription>
+                      <CardDescription className="text-teal-700">
+                        {pagoData.pse.mensaje}
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-4 bg-teal-50 rounded-lg">
+                    <CardContent className="p-6 space-y-4">
+                      <div className="p-4 bg-teal-50 rounded-lg border border-teal-200">
                         <p className="text-sm font-semibold text-teal-900 mb-2">
-                          Referencia:
+                          Referencia de pago:
                         </p>
                         <div className="flex items-center gap-2">
-                          <code className="flex-1 text-lg font-mono text-teal-700">
+                          <code className="flex-1 text-lg font-mono font-bold text-teal-700 bg-teal-100 px-3 py-2 rounded">
                             {pagoData.pse.referencia}
                           </code>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => copiarTexto(pagoData.pse.referencia, 'Referencia')}
+                            className="border-teal-300 text-teal-700 hover:bg-teal-50"
                           >
                             <Copy className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
 
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-sm">
-                          En producción, serías redirigido al portal PSE de tu banco.
+                      <Alert className="bg-blue-50 border-blue-200">
+                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-blue-800">
+                          En un entorno de producción, serías redirigido automáticamente al portal PSE de tu banco.
                         </AlertDescription>
                       </Alert>
 
                       <Button
                         onClick={handleConfirmarYRedirigir}
-                        className="w-full"
+                        className="w-full h-12 bg-teal-600 hover:bg-teal-700"
                       >
-                        Entendido
+                        Entendido, continuar
                       </Button>
                     </CardContent>
                   </Card>
                 )}
 
-                {/* CONSIGNACIÓN */}
                 {metodoPago === 'CONSIGNACION' && pagoData.consignacion && (
                   <Card className="border-slate-200 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
+                    <CardHeader className="bg-slate-50 rounded-t-lg border-b">
+                      <CardTitle className="flex items-center gap-3 text-slate-800">
                         <FileText className="w-6 h-6 text-slate-700" />
                         Instrucciones de Consignación
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="p-6 space-y-4">
                       <DatoConsignacion
                         label="Banco"
                         valor={pagoData.consignacion.banco}
+                        icon={<Building className="w-4 h-4" />}
                       />
                       <DatoConsignacion
                         label="Tipo de cuenta"
@@ -601,94 +734,106 @@ export default function CartPage() {
                         label="Número de cuenta"
                         valor={pagoData.consignacion.numeroCuenta}
                         copiable
-                        onCopiar={() => copiarTexto(pagoData.consignacion.numeroCuenta, 'Cuenta')}
+                        onCopiar={() => copiarTexto(pagoData.consignacion.numeroCuenta, 'Número de cuenta')}
                       />
                       <DatoConsignacion
-                        label="Referencia"
+                        label="Referencia única"
                         valor={pagoData.consignacion.referencia}
                         copiable
                         destacado
                         onCopiar={() => copiarTexto(pagoData.consignacion.referencia, 'Referencia')}
                       />
-                      <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-                        <p className="text-sm font-semibold text-blue-900 mb-1">Monto:</p>
+                      
+                      <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+                        <p className="text-sm font-semibold text-blue-900 mb-2">Monto a consignar:</p>
                         <p className="text-3xl font-bold text-blue-700">
-                          {formatPrice(compraData.total)} COP
+                          {formatPrice(compraData?.total || calcularTotal())}
+                        </p>
+                        <p className="text-sm text-blue-600 mt-2">
+                          Este monto debe coincidir exactamente con la consignación
                         </p>
                       </div>
 
                       <Alert className="bg-amber-50 border-amber-200">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
-                        <AlertDescription className="text-sm text-amber-800">
-                          <strong>Nota:</strong> Las consignaciones deben ser verificadas manualmente.
-                          Tu pedido será procesado una vez validemos el pago.
+                        <AlertDescription className="text-amber-800">
+                          <strong>Importante:</strong> Las consignaciones son validadas manualmente. 
+                          Tu pedido será procesado una vez confirmemos el pago, lo que puede tomar hasta 24 horas.
                         </AlertDescription>
                       </Alert>
 
                       <Button
                         onClick={handleConfirmarYRedirigir}
-                        className="w-full"
+                        className="w-full h-12"
                       >
-                        Entendido
+                        Entendido, he realizado la consignación
                       </Button>
                     </CardContent>
                   </Card>
                 )}
-              </>
+              </div>
             )}
 
             {/* STEP: Éxito */}
             {step === 'exito' && (
-              <Card className="border-green-100 shadow-2xl">
-                <CardContent className="pt-12 pb-8 text-center space-y-6">
+              <Card className="border-green-200 shadow-2xl overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-green-500 to-emerald-500"></div>
+                <CardContent className="pt-16 pb-12 px-8 text-center space-y-8">
                   <div className="flex justify-center">
-                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
-                      <PartyPopper className="w-12 h-12 text-green-600" />
+                    <div className="relative">
+                      <div className="w-32 h-32 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center shadow-lg">
+                        <PartyPopper className="w-16 h-16 text-green-600" />
+                      </div>
+                      <div className="absolute -top-2 -right-2">
+                        <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
+                          <CheckCircle className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-bold text-slate-800">
-                      ¡Gracias por tu compra!
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                      ¡Compra Exitosa!
                     </h2>
-                    <p className="text-lg text-slate-600">
-                      Tu pedido ha sido procesado exitosamente.
+                    <p className="text-xl text-slate-600 max-w-md mx-auto leading-relaxed">
+                      Tu pedido ha sido confirmado y está siendo procesado. Recibirás una confirmación por email.
                     </p>
                   </div>
 
-                  <div className="p-6 bg-green-50 rounded-lg space-y-3">
+                  <div className="p-6 bg-green-50 rounded-2xl border border-green-200 space-y-4 max-w-md mx-auto">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Orden ID:</span>
-                      <span className="font-mono text-sm text-slate-600">{ordenId}</span>
+                      <span className="text-slate-600">Número de orden:</span>
+                      <span className="font-mono font-semibold text-slate-800">{ordenId}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Total pagado:</span>
-                      <span className="font-semibold text-green-600">
-                        {formatPrice(calcularTotal())} COP
+                      <span className="text-2xl font-bold text-green-600">
+                        {formatPrice(calcularTotal())}
                       </span>
                     </div>
                   </div>
 
-                  <Alert className="text-left">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-sm">
-                      Recibirás una confirmación por correo electrónico con los detalles de tu pedido.
+                  <Alert className="max-w-md mx-auto text-left bg-blue-50 border-blue-200">
+                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      <strong>Estado:</strong> Tu pedido está siendo preparado. Te notificaremos cuando sea enviado.
                     </AlertDescription>
                   </Alert>
 
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <div className="flex flex-col sm:flex-row gap-4 pt-6 max-w-md mx-auto">
                     <Button
                       onClick={() => router.push('/dashboard/mis-compras')}
-                      className="flex-1"
+                      className="flex-1 h-12 bg-slate-800 hover:bg-slate-900"
                     >
-                      Ver mis compras
+                      Ver Mis Compras
                     </Button>
                     <Button
                       onClick={() => router.push('/dashboard/farmacia')}
                       variant="outline"
-                      className="flex-1"
+                      className="flex-1 h-12 border-slate-300 text-slate-700 hover:bg-slate-50"
                     >
-                      Seguir comprando
+                      Seguir Comprando
                     </Button>
                   </div>
                 </CardContent>
@@ -699,45 +844,83 @@ export default function CartPage() {
           {/* Columna derecha: Resumen */}
           {step !== 'exito' && (
             <div className="space-y-6">
-              <Card className="border-blue-100 shadow-lg sticky top-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-blue-600" />
-                    Resumen
+              <Card className="border-slate-200 shadow-lg sticky top-6 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-3 text-slate-800">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Package className="w-5 h-5 text-blue-600" />
+                    </div>
+                    Resumen del Pedido
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
+                <CardContent className="space-y-6">
+                  {/* Lista de productos */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-slate-600">Productos</p>
+                    {items.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-3">
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.title}
+                              className="w-10 h-10 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center">
+                              <Package className="w-4 h-4 text-slate-400" />
+                            </div>
+                          )}
+                          <div className="max-w-[120px]">
+                            <p className="font-medium text-slate-800 truncate">{item.title}</p>
+                            <p className="text-slate-500">x{item.qty}</p>
+                          </div>
+                        </div>
+                        <span className="font-semibold text-slate-800">
+                          {formatPrice(Number(item.price) * item.qty)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-slate-200">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Subtotal</span>
-                      <span className="font-semibold">
-                        {formatPrice(calcularSubtotal())} COP
+                      <span className="font-semibold text-slate-800">
+                        {formatPrice(calcularSubtotal())}
                       </span>
                     </div>
+                    
                     {promocionAplicada && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Descuento ({promocionAplicada.porcentaje}%)</span>
-                        <span className="font-semibold">
-                          -{formatPrice(promocionAplicada.descuentoAplicado)} COP
+                      <div className="flex justify-between text-sm">
+                        <span className="text-green-600">Descuento ({promocionAplicada.porcentaje}%)</span>
+                        <span className="font-semibold text-green-600">
+                          -{formatPrice(promocionAplicada.descuentoAplicado)}
                         </span>
                       </div>
                     )}
-                    <div className="pt-2 border-t border-slate-200">
-                      <div className="flex justify-between">
+
+                    <div className="pt-3 border-t border-slate-200">
+                      <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-slate-800">Total</span>
                         <span className="text-2xl font-bold text-blue-600">
-                          {formatPrice(calcularTotal())} COP
+                          {formatPrice(calcularTotal())}
                         </span>
                       </div>
+                      <p className="text-xs text-slate-500 mt-1 text-right">
+                        IVA incluido
+                      </p>
                     </div>
                   </div>
 
+                  {/* Información contextual según el paso */}
                   {step === 'direccion' && direccionSeleccionada && (
                     <div className="pt-4 border-t border-slate-200">
                       <p className="text-sm font-semibold text-slate-600 mb-2">
-                        Entregar en:
+                        📍 Dirección seleccionada:
                       </p>
-                      <p className="text-sm text-slate-800">
+                      <p className="text-sm text-slate-800 leading-relaxed">
                         {direcciones.find((d: any) => d.id === direccionSeleccionada)?.direccion_completa}
                       </p>
                     </div>
@@ -746,11 +929,11 @@ export default function CartPage() {
                   {step === 'pago' && (
                     <div className="pt-4 border-t border-slate-200">
                       <p className="text-sm font-semibold text-slate-600 mb-2">
-                        Método de pago:
+                        💳 Método de pago:
                       </p>
-                      <p className="text-sm text-slate-800">
-                        {metodoPago === 'TARJETA_CREDITO' && 'Tarjeta de Crédito'}
-                        {metodoPago === 'PASARELA' && 'PASARELA'}
+                      <p className="text-sm text-slate-800 font-medium">
+                        {metodoPago === 'TARJETA_CREDITO' && 'Tarjeta de Crédito/Débito'}
+                        {metodoPago === 'PASARELA' && 'PSE - Pago en Línea'}
                         {metodoPago === 'CONSIGNACION' && 'Consignación Bancaria'}
                       </p>
                     </div>
@@ -765,25 +948,36 @@ export default function CartPage() {
   );
 }
 
-// Componente auxiliar para datos de consignación
+// Componente auxiliar mejorado para datos de consignación
 function DatoConsignacion({ 
   label, 
   valor, 
   copiable, 
   destacado, 
-  onCopiar 
+  onCopiar,
+  icon
 }: { 
   label: string; 
   valor: string; 
   copiable?: boolean; 
   destacado?: boolean; 
   onCopiar?: () => void;
+  icon?: React.ReactNode;
 }) {
   return (
-    <div className={`p-4 rounded-lg ${destacado ? 'bg-yellow-50 border-2 border-yellow-300' : 'bg-slate-50'}`}>
-      <p className="text-sm font-semibold text-slate-600 mb-1">{label}:</p>
+    <div className={`p-4 rounded-xl border transition-all ${
+      destacado 
+        ? 'bg-yellow-50 border-2 border-yellow-300 shadow-sm' 
+        : 'bg-slate-50 border-slate-200'
+    }`}>
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <p className="text-sm font-semibold text-slate-600">{label}:</p>
+      </div>
       <div className="flex items-center gap-2">
-        <p className={`flex-1 ${destacado ? 'font-mono text-lg font-bold' : 'font-medium'} text-slate-800`}>
+        <p className={`flex-1 ${
+          destacado ? 'font-mono text-lg font-bold text-yellow-800' : 'font-medium text-slate-800'
+        }`}>
           {valor}
         </p>
         {copiable && onCopiar && (
@@ -791,6 +985,11 @@ function DatoConsignacion({
             size="sm"
             variant="outline"
             onClick={onCopiar}
+            className={`${
+              destacado 
+                ? 'border-yellow-300 text-yellow-700 hover:bg-yellow-50' 
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
           >
             <Copy className="w-4 h-4" />
           </Button>
@@ -798,4 +997,10 @@ function DatoConsignacion({
       </div>
     </div>
   );
+}
+
+// Función auxiliar para copiar texto
+function copiarTexto(texto: string, label: string) {
+  navigator.clipboard.writeText(texto);
+  toast.success(`${label} copiado al portapapeles`);
 }

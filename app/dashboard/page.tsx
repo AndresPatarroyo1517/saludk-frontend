@@ -9,14 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
-import { 
-  Calendar, 
-  ShoppingBag, 
-  FileText, 
-  CreditCard, 
-  AlertCircle, 
+import {
+  Calendar,
+  ShoppingBag,
+  FileText,
+  CreditCard,
+  AlertCircle,
   CheckCircle,
-  Loader2 
+  Loader2
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -60,20 +60,20 @@ export default function DashboardPage() {
     // Calcular estadísticas cuando el usuario cambie
     if (user) {
       const proximasCitas = user.proximas_citas?.length || 0;
-      
+
       const historialItems = user.historial_medico
         ? (user.historial_medico.enfermedades_cronicas?.length || 0) +
-          (user.historial_medico.cirugias_previas?.length || 0) +
-          (user.historial_medico.medicamentos_actuales?.length || 0)
+        (user.historial_medico.cirugias_previas?.length || 0) +
+        (user.historial_medico.medicamentos_actuales?.length || 0)
         : 0;
-      
+
       const ordenesRecientes = user.ordenes_pago?.length || 0;
       const tienePlanActivo = !!user.plan_activo;
       const planNombre = user.plan_activo?.plan?.nombre || null;
-      
-      const consultasVirtualesDisponibles = 
+
+      const consultasVirtualesDisponibles =
         user.plan_activo?.consultas_virtuales?.disponibles || 0;
-      const consultasPresencialesDisponibles = 
+      const consultasPresencialesDisponibles =
         user.plan_activo?.consultas_presenciales?.disponibles || 0;
 
       setStats({
@@ -226,7 +226,7 @@ export default function DashboardPage() {
                   <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
                   <div className="flex-1">
                     <CardTitle className="text-green-800">Plan Activo: {stats.planNombre}</CardTitle>
-                    <CardDescription className="text-green-700 mt-2">
+                    <CardContent className="text-green-700 mt-2"> 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <span className="font-medium">Consultas Virtuales:</span>{' '}
@@ -237,7 +237,7 @@ export default function DashboardPage() {
                           {stats.consultasPresencialesDisponibles} disponibles
                         </div>
                       </div>
-                    </CardDescription>
+                    </CardContent>
                   </div>
                 </div>
               </CardHeader>
@@ -304,8 +304,8 @@ export default function DashboardPage() {
                 </div>
                 <CardTitle>Planes de Suscripción</CardTitle>
                 <CardDescription>
-                  {stats.tienePlanActivo 
-                    ? 'Gestiona tu plan actual o cámbialo' 
+                  {stats.tienePlanActivo
+                    ? 'Gestiona tu plan actual o cámbialo'
                     : 'Suscríbete a un plan para acceder a todos los servicios'}
                 </CardDescription>
               </CardHeader>
