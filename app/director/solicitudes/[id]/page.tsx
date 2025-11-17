@@ -22,9 +22,11 @@ export default function DetalleSolicitud() {
         if (!id) return;
         (async () => {
             try {
-                const data = await solicitudesService.getDocumentosSolicitud(id as string);
-                setDocumentos(data || []);
-            } catch {
+                const response = await solicitudesService.getDocumentosSolicitud(id as string);
+                // Aquí accedemos al array real de documentos
+                setDocumentos(response.data || []);
+            } catch (err) {
+                console.error(err);
                 setDocumentos([]);
             }
         })();
@@ -47,7 +49,7 @@ export default function DetalleSolicitud() {
                 <p>Solicitud no encontrada o no cargada.</p>
                 <button
                     onClick={() => router.back()}
-                    className="mt-4 px-3 py-2 bg-slate-100 rounded-md hover:bg-slate-200"
+                    className="mt-4 px-3 py-2 bg-slate-100 rounded-md hover:bg-slate-200 cursor-pointer"
                 >
                     Volver
                 </button>
@@ -136,7 +138,7 @@ export default function DetalleSolicitud() {
                             documentos.map((doc, i) => (
                                 <a
                                     key={i}
-                                    href={doc.url || doc.link}
+                                    href={doc.ruta_storj}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="block px-3 py-2 rounded-md bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-sm transition"
@@ -154,20 +156,20 @@ export default function DetalleSolicitud() {
             {/* Tamago: Botones */}
             <div className="col-span-2 row-span-1 bg-linear-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg flex items-center justify-end gap-3 p-4">
                 <button onClick={handleAprobar}
-                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition">
+                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition cursor-pointer">
                     Aprobar
                 </button>
                 <button onClick={() => { setAccion('devolver'); setModalMotivoOpen(true); }}
-                    className="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition">
+                    className="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition cursor-pointer">
                     Devolver
                 </button>
                 <button onClick={() => { setAccion('rechazar'); setModalMotivoOpen(true); }}
-                    className="px-3 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition">
+                    className="px-3 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition cursor-pointer">
                     Rechazar
                 </button>
                 <button
                     onClick={() => router.back()}
-                    className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition"
+                    className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition cursor-pointer"
                 >
                     Volver a la lista
                 </button>
@@ -192,13 +194,13 @@ export default function DetalleSolicitud() {
                         />
                         <div className="flex justify-end gap-3 mt-4">
                             <button
-                                className="px-3 py-2 bg-rose-500 rounded-lg hover:bg-rose-600 transition"
+                                className="px-3 py-2 bg-rose-500 rounded-lg hover:bg-rose-600 transition cursor-pointer"
                                 onClick={() => setModalMotivoOpen(false)}
                             >
                                 Cancelar
                             </button>
                             <button
-                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
                                 onClick={handleAccionConMotivo}
                             >
                                 Confirmar
@@ -220,7 +222,7 @@ export default function DetalleSolicitud() {
                             {accion === 'devolver' && 'La solicitud ha sido devuelta exitosamente.'}
                         </Description>
                         <button
-                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
                             onClick={handleConfirmClose}
                         >
                             Cerrar

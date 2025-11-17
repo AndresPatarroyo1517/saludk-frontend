@@ -38,9 +38,38 @@ export interface RegisterData {
   };
 }
 
+export interface PacienteRegister {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  numero_identificacion: string;
+}
+
+export interface UsuarioRegister {
+  id: string;
+  email: string;
+  activo: boolean;
+}
+
+export interface DireccionRegister {
+  id: string;
+  ciudad: string;
+  departamento: string;
+}
+
+export interface SolicitudData {
+  solicitud_id: string;
+  estado: string;
+  paciente: PacienteRegister;
+  usuario: UsuarioRegister;
+  direccion: DireccionRegister;
+  fecha_solicitud: string; // ISO 8601 string
+}
+
 export interface RegisterResponse {
+  success: boolean;
   message: string;
-  solicitud_id: number;
+  data: SolicitudData;
 }
 
 export const authService = {
@@ -54,7 +83,7 @@ export const authService = {
     return response.data;
   },
 
-  uploadDocuments: async (solicitudId: number, files: File[]) => {
+  uploadDocuments: async (solicitudId: number | string, files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('documento', file);
@@ -66,6 +95,7 @@ export const authService = {
         headers: { 'Content-Type': 'multipart/form-data' },
       }
     );
+    //console.log('Datos:', JSON.stringify(response.data, null, 2));
     return response.data;
   },
 
@@ -81,6 +111,12 @@ export const authService = {
 
   me: async (): Promise<AuthResponse> => {
     const response = await apiClient.get('/login/me');
+    return response.data;
+  },
+
+  validacionAutomatica: async (solicitudId: number | string) => {
+    const response = await apiClient.post(`/validacion/solicitudes/${solicitudId}/revisar`);
+    console.log('Datos:', JSON.stringify(response.data, null, 2));
     return response.data;
   },
 };

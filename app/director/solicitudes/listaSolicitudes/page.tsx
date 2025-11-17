@@ -16,7 +16,7 @@ export default function ListaSolicitudes() {
             <div>
                 <button
                     onClick={() => router.back()}
-                    className="mb-4 px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition"
+                    className="mb-4 px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition cursor-pointer"
                 >
                     Volver a la lista
                 </button>
@@ -37,7 +37,7 @@ export default function ListaSolicitudes() {
 
             <button
                 onClick={() => router.back()}
-                className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition"
+                className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition cursor-pointer"
             >
                 Volver a la lista
             </button>

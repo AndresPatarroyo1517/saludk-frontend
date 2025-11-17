@@ -125,7 +125,7 @@ export default function SolicitudesPage() {
                         <p className={`text-sm mt-1 ${palAprob.sub}`}>Total en estado APROBADA</p>
                         <button
                             onClick={() => router.push('/director/solicitudes/listaSolicitudes?tipo=aprobadas')}
-                            className="mt-3 text-sm underline text-slate-600 hover:text-slate-900"
+                            className="mt-3 text-sm text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
                         >
                             Ver lista
                         </button>
@@ -146,7 +146,7 @@ export default function SolicitudesPage() {
                         </p>
                         <button
                             onClick={() => router.push('/director/solicitudes/listaSolicitudes?tipo=pendientes')}
-                            className="mt-3 text-sm underline text-slate-600 hover:text-slate-900"
+                            className="mt-3 text-sm text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
                         >
                             Ver lista
                         </button>

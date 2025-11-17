@@ -113,16 +113,22 @@ export default function RegisterPage() {
       };
 
       const response = await authService.register(registerData);
+      if (response.success && response.data.solicitud_id) {
+        console.log(`De verififcacion: ${response.data.solicitud_id}`);
+        await authService.validacionAutomatica(response.data.solicitud_id);
+      }
       setLoadingProgress(50);
 
       // Si hay documentos, subirlos
-      if (files.length > 0 && response.solicitud_id) {
+      if (files.length > 0 && response.data.solicitud_id) {
+        console.log(`Con documento: ${response.data.solicitud_id}`);
         setStep('uploading');
         setLoadingProgress(60);
 
-        await authService.uploadDocuments(response.solicitud_id, files);
+        await authService.uploadDocuments(response.data.solicitud_id, files);
         setLoadingProgress(100);
       } else {
+        console.log(`No hay documento o id`);
         setLoadingProgress(100);
       }
 
