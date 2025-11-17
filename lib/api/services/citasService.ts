@@ -82,6 +82,12 @@ export const citasService = {
       }
       throw err;
     }
+  },
+
+  modificarEstadoCita: async (citaId: string, data: any) => {
+    // Backend: PUT /citas/:citaId (editar una cita existente)
+    const response = await apiClient.put(`/citas/${citaId}`, data);
+    return response.data;
   }
 ,
 
