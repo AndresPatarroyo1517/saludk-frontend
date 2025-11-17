@@ -21,7 +21,8 @@ import {
   Package,
   PartyPopper,
   CreditCard,
-  Building
+  Building,
+  DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
 import MetodoPagoSelector from '@/components/checkout/MetodoPagoSelector';
@@ -31,6 +32,23 @@ import { useAuthStore } from '@/lib/store/authStore';
 
 type MetodoPago = 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';
 type Step = 'carrito' | 'direccion' | 'pago' | 'confirmacion' | 'exito';
+
+// Función para convertir COP a USD (tasa de cambio aproximada)
+const convertirCopAUsd = (montoCOP: number): number => {
+  // Tasa de cambio aproximada - puedes obtenerla de una API en producción
+  const tasaCambio = 0.00024; // 1 COP ≈ 0.00024 USD
+  return montoCOP * tasaCambio;
+};
+
+// Función para formatear precio en USD
+const formatPriceUSD = (value: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
 
 export default function CartPage() {
   const router = useRouter();
@@ -44,6 +62,7 @@ export default function CartPage() {
   const [compraData, setCompraData] = useState<any>(null);
   const [pagoData, setPagoData] = useState<any>(null);
   const [ordenId, setOrdenId] = useState<string>('');
+  const [montoUSD, setMontoUSD] = useState<number>(0);
   
   const [codigoPromocion, setCodigoPromocion] = useState('');
   const [aplicandoPromocion, setAplicandoPromocion] = useState(false);
@@ -78,6 +97,15 @@ export default function CartPage() {
       maximumFractionDigits: 0,
     }).format(value);
   };
+
+  // Actualizar monto USD cuando cambien los datos de pago
+  useEffect(() => {
+    if (pagoData && compraData) {
+      const totalCOP = compraData.total || calcularTotal();
+      const montoUSD = convertirCopAUsd(totalCOP);
+      setMontoUSD(montoUSD);
+    }
+  }, [pagoData, compraData]);
 
   const eliminarProducto = (id: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: id });
@@ -168,8 +196,14 @@ export default function CartPage() {
         setOrdenId(responseData.ordenPago.id);
       }
 
+      // Calcular monto USD antes de guardar los datos
+      const totalCOP = responseData.compra.total || calcularTotal();
+      const montoUSDCalculado = convertirCopAUsd(totalCOP);
+      setMontoUSD(montoUSDCalculado);
+
       setCompraData(responseData.compra);
-      setPagoData(responseData.ordenPago);
+      setPagoData(responseData);
+      
       setStep('confirmacion');
       
       toast.success('Compra creada exitosamente', {
@@ -232,21 +266,36 @@ export default function CartPage() {
     router.push('/dashboard/mis-compras');
   };
 
-  // Renderizar formulario de Stripe condicionalmente
+  // Función para renderizar el formulario de Stripe - MEJORADA
   const renderStripeForm = () => {
-    if (metodoPago === 'TARJETA_CREDITO' && pagoData?.stripe) {
+    if (!pagoData?.stripe?.clientSecret) {
+      console.error('❌ No hay clientSecret disponible:', pagoData);
       return (
-        <StripeCheckout
-          clientSecret={pagoData.stripe.clientSecret}
-          monto={pagoData.stripe.amount_usd}
-          montoCOP={compraData?.total || calcularTotal()}
-          onSuccess={handlePagoExitoso}
-          onError={handlePagoError}
-          descripcion="Compra de productos farmacéuticos"
-        />
+        <Alert variant="destructive" className="animate-pulse">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Error al cargar el formulario de pago. No se encontró clientSecret.
+          </AlertDescription>
+        </Alert>
       );
     }
-    return null;
+
+    return (
+      <StripeCheckout
+        clientSecret={pagoData.stripe.clientSecret}
+        monto={montoUSD} // Usar el monto en USD calculado
+        montoCOP={compraData?.total || calcularTotal()}
+        onSuccess={handlePagoExitoso}
+        onError={handlePagoError}
+        descripcion={`Compra #${compraData?.numero_orden || ''}`}
+      />
+    );
+  };
+
+  // Función para copiar texto
+  const copiarTexto = (texto: string, label: string) => {
+    navigator.clipboard.writeText(texto);
+    toast.success(`${label} copiado al portapapeles`);
   };
 
   if (items.length === 0 && step !== 'exito') {
@@ -627,13 +676,13 @@ export default function CartPage() {
               </>
             )}
 
-            {/* STEP: Confirmación - SOLUCIÓN PARA STRIPE */}
+            {/* STEP: Confirmación - MEJORADO CON PRECIO EN USD */}
             {step === 'confirmacion' && pagoData && (
               <div className="space-y-6">
-                {/* TARJETA: Stripe - Renderizado condicional mejorado */}
+                {/* TARJETA: Stripe - MEJORADO */}
                 {metodoPago === 'TARJETA_CREDITO' && (
                   <div className="animate-in fade-in duration-500">
-                    {pagoData.stripe ? (
+                    {pagoData.stripe?.clientSecret ? (
                       <Card className="border-blue-200 shadow-lg">
                         <CardHeader className="bg-blue-50 rounded-t-lg border-b border-blue-100">
                           <CardTitle className="flex items-center gap-3 text-blue-900">
@@ -649,6 +698,8 @@ export default function CartPage() {
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
+                         
+                          
                           {renderStripeForm()}
                         </CardContent>
                       </Card>
@@ -656,7 +707,7 @@ export default function CartPage() {
                       <Alert variant="destructive" className="animate-pulse">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                          Error al cargar el formulario de pago. Por favor, intenta de nuevo.
+                          Error: No se pudo cargar el formulario de pago. ClientSecret no disponible.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -749,9 +800,10 @@ export default function CartPage() {
                         <p className="text-3xl font-bold text-blue-700">
                           {formatPrice(compraData?.total || calcularTotal())}
                         </p>
-                        <p className="text-sm text-blue-600 mt-2">
-                          Este monto debe coincidir exactamente con la consignación
-                        </p>
+                        <div className="flex items-center gap-1 mt-2 text-sm text-blue-600">
+                          <DollarSign className="w-4 h-4" />
+                          {formatPriceUSD(montoUSD)} USD
+                        </div>
                       </div>
 
                       <Alert className="bg-amber-50 border-amber-200">
@@ -808,9 +860,15 @@ export default function CartPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Total pagado:</span>
-                      <span className="text-2xl font-bold text-green-600">
-                        {formatPrice(calcularTotal())}
-                      </span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-green-600 block">
+                          {formatPrice(compraData?.total)}
+                        </span>
+                        <span className="text-sm text-green-700 flex items-center gap-1 mt-1">
+                          <DollarSign className="w-4 h-4" />
+                          {formatPriceUSD(montoUSD)} USD
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -841,7 +899,7 @@ export default function CartPage() {
             )}
           </div>
 
-          {/* Columna derecha: Resumen */}
+          {/* Columna derecha: Resumen - MEJORADO CON USD */}
           {step !== 'exito' && (
             <div className="space-y-6">
               <Card className="border-slate-200 shadow-lg sticky top-6 overflow-hidden">
@@ -904,9 +962,15 @@ export default function CartPage() {
                     <div className="pt-3 border-t border-slate-200">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-slate-800">Total</span>
-                        <span className="text-2xl font-bold text-blue-600">
-                          {formatPrice(calcularTotal())}
-                        </span>
+                        <div className="text-right">
+                          <span className="text-2xl font-bold text-blue-600 block">
+                            {formatPrice(calcularTotal())}
+                          </span>
+                          <span className="text-sm text-blue-700 flex items-center gap-1 mt-1">
+                            <DollarSign className="w-3 h-3" />
+                            {formatPriceUSD(convertirCopAUsd(calcularTotal()))} USD
+                          </span>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-500 mt-1 text-right">
                         IVA incluido
@@ -997,10 +1061,4 @@ function DatoConsignacion({
       </div>
     </div>
   );
-}
-
-// Función auxiliar para copiar texto
-function copiarTexto(texto: string, label: string) {
-  navigator.clipboard.writeText(texto);
-  toast.success(`${label} copiado al portapapeles`);
 }

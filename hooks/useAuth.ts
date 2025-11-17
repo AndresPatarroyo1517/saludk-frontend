@@ -53,6 +53,15 @@ export function useAuth() {
         console.log('✅ [useAuth] Login exitoso:', response.usuario.email);
         setAuth(response.usuario);
         
+        // ✅ NUEVO: Obtener datos completos del usuario después del login
+        console.log('🔄 [useAuth] Obteniendo datos completos del usuario...');
+        try {
+          await fetchUserData();
+          console.log('✅ [useAuth] Datos completos obtenidos');
+        } catch (err) {
+          console.warn('⚠️ [useAuth] Error al obtener datos completos, usando datos del login');
+        }
+        
         return {
           success: true,
           rol: response.usuario.rol,
@@ -61,11 +70,13 @@ export function useAuth() {
       }
       
       return response;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [useAuth] Error en login:', error);
+      // ✅ Asegurar que se marque como inicializado incluso si falla
+      useAuthStore.getState().setInitialized(true);
       throw error;
     }
-  }, [setAuth]);
+  }, [setAuth, fetchUserData]);
 
   const logout = useCallback(async () => {
     try {

@@ -145,6 +145,7 @@ export const useAuthStore = create<AuthState>()(
           user,
           isAuthenticated: true,
           isInitialized: true,
+          isLoading: false, // ✅ Asegurar que no quede cargando
           error: null
         });
       },
@@ -155,6 +156,7 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           isAuthenticated: false,
           isInitialized: true,
+          isLoading: false, // ✅ Asegurar que no quede cargando
           error: null
         });
       },
@@ -178,7 +180,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       /**
-       * ✅ CORREGIDO: Usar apiClient en lugar de fetch directo
+       * ✅ CORREGIDO: Usar apiClient y verificar si hay usuario persistido
        */
       fetchUserData: async () => {
         const state = get();
@@ -189,9 +191,16 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
+        // ✅ Si no hay usuario persistido, no hacer petición
+        if (!state.user && !state.isAuthenticated) {
+          console.log('⏭️ [authStore] No hay sesión persistida, omitiendo verificación');
+          set({ isInitialized: true, isLoading: false });
+          return;
+        }
+
         try {
           set({ isLoading: true, error: null });
-          console.log('🔄 [authStore] Verificando sesión...');
+          console.log('🔄 [authStore] Verificando sesión persistida...');
 
           // ✅ Usar apiClient que maneja cookies y refresh automáticamente
           const response = await apiClient.get('/login/me');
@@ -233,6 +242,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        // ❌ NO persistir isInitialized para forzar verificación en cada carga
       })
     }
   )

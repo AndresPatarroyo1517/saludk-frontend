@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/lib/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +29,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isInitialized, user } = useAuth();
+  const { setInitialized } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +46,13 @@ export default function LoginPage() {
     },
   });
 
-  // ✅ Simplificado - Solo verificar una vez cuando inicialice
+  // ✅ CRÍTICO: Marcar como inicializado inmediatamente al montar
+  useEffect(() => {
+    console.log('🔐 [LoginPage] Página de login montada, forzando inicialización');
+    setInitialized(true);
+  }, [setInitialized]);
+
+  // ✅ Si ya está autenticado, redirigir
   useEffect(() => {
     if (!isInitialized) return;
     
@@ -52,30 +60,39 @@ export default function LoginPage() {
       redirected.current = true;
       const normalizedRole = user.rol.toLowerCase() as UserRole;
       const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
-      console.log(`✅ Usuario autenticado, redirigiendo a ${targetRoute}`);
+      console.log(`✅ [LoginPage] Usuario autenticado, redirigiendo a ${targetRoute}`);
       router.replace(targetRoute);
     }
-  }, [isInitialized, isAuthenticated, user]);
+  }, [isInitialized, isAuthenticated, user, router]);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setServerError(null);
 
     try {
-      console.log('🔐 Intentando login...');
-      await login(data.email, data.password, data.rememberMe || false);
+      console.log('🔑 [LoginPage] Intentando login para:', data.email);
+      const response = await login(data.email, data.password, data.rememberMe || false);
       
-      console.log('✅ Login exitoso');
-      
-      toast.success('¡Bienvenido de nuevo!', {
-        icon: <CheckCircle2 className="w-5 h-5" />,
-        description: 'Has iniciado sesión correctamente',
-      });
+      if (response.success && response.usuario) {
+        console.log('✅ [LoginPage] Login exitoso');
+        
+        toast.success('¡Bienvenido de nuevo!', {
+          icon: <CheckCircle2 className="w-5 h-5" />,
+          description: 'Has iniciado sesión correctamente',
+        });
 
-      // ✅ El useEffect manejará la redirección automáticamente
-
+        // ✅ El useEffect manejará la redirección automáticamente
+      } else {
+        const errorMsg = response.message || 'Credenciales inválidas';
+        setServerError(errorMsg);
+        toast.error('Error de autenticación', {
+          icon: <AlertCircle className="w-5 h-5" />,
+          description: errorMsg,
+          duration: 5000,
+        });
+      }
     } catch (error: any) {
-      console.error('❌ Error en login:', error);
+      console.error('❌ [LoginPage] Error en login:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message ||
@@ -93,21 +110,16 @@ export default function LoginPage() {
     }
   };
 
-  // Mostrar loader solo mientras inicializa
-  if (!isInitialized) {
+  // ✅ Si ya está autenticado, no mostrar nada (se está redirigiendo)
+  if (isAuthenticated && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Verificando sesión...</p>
+          <p className="text-slate-600 font-medium">Redirigiendo...</p>
         </div>
       </div>
     );
-  }
-
-  // Si ya está autenticado, no mostrar nada (se está redirigiendo)
-  if (isAuthenticated) {
-    return null;
   }
 
   return (

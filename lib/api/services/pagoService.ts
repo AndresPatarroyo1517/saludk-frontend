@@ -168,7 +168,7 @@ export const pagoService = {
     },
 
     confirmarCompra: async (compraId: string) => {
-        const response = await fetch(`/api/productos/compra/${compraId}/confirmar`, {
+        const response = await fetch(`/productos/compra/${compraId}/confirmar`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

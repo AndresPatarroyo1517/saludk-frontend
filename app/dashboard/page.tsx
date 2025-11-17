@@ -30,7 +30,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user, isLoading, error } = useAuthStore();
+  const { user, isLoading, error, fetchUserData } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({
     proximasCitas: 0,
     historialItems: 0,
@@ -41,7 +41,21 @@ export default function DashboardPage() {
     consultasPresencialesDisponibles: 0
   });
 
-  // ✅ ELIMINADO: No hacer fetch aquí, ProtectedRoute ya lo maneja
+  // ✅ NUEVO: Refrescar datos al montar el componente
+  useEffect(() => {
+    const refreshData = async () => {
+      if (user) {
+        console.log('🔄 [Dashboard] Refrescando datos del usuario...');
+        try {
+          await fetchUserData();
+        } catch (error) {
+          console.error('❌ [Dashboard] Error al refrescar datos:', error);
+        }
+      }
+    };
+
+    refreshData();
+  }, []); // ✅ Solo al montar
 
   useEffect(() => {
     // ✅ Calcular estadísticas cuando el usuario cambie
@@ -77,7 +91,7 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  // ✅ Estado de carga (manejado por ProtectedRoute)
+  // ✅ Estado de carga
   if (isLoading) {
     return (
       <ProtectedRoute allowedRoles={['paciente']}>
