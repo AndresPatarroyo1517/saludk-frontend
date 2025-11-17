@@ -96,6 +96,7 @@ export interface User {
   id: string;
   email: string;
   rol: 'paciente' | 'medico' | 'admin';
+  paciente_id?: string;
   activo: boolean;
   ultimo_acceso: string | null;
   datos_personales: DatosPersonales | null;

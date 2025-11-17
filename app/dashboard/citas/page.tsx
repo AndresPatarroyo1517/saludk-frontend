@@ -69,7 +69,7 @@ export default function MisCitasPage() {
   // Debug: mostrar información del usuario
   useEffect(() => {
     console.log('📋 User actual:', user);
-    console.log('📋 paciente_id:', user?.paciente_id);
+    console.log('📋 paciente_id:', user?.paciente_id || user?.datos_personales?.id || user?.id);
     console.log('📋 user.id:', user?.id);
   }, [user]);
 
@@ -99,7 +99,7 @@ export default function MisCitasPage() {
 
   useEffect(() => {
     const load = async () => {
-      const paciente_id = user?.paciente_id || user?.id;
+      const paciente_id = user?.paciente_id || user?.datos_personales?.id || user?.id;
       if (!paciente_id) return;
       setLoading(true);
       try {
@@ -160,10 +160,10 @@ export default function MisCitasPage() {
     };
 
     load();
-  }, [user?.paciente_id, user?.id]);
+  }, [user?.paciente_id, user?.datos_personales?.id, user?.id]);
 
   const refreshCitas = async () => {
-    const paciente_id = user?.paciente_id || user?.id;
+    const paciente_id = user?.paciente_id || user?.datos_personales?.id || user?.id;
     if (!paciente_id) return;
     try {
       try {
@@ -218,6 +218,15 @@ export default function MisCitasPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [citaToCancel, setCitaToCancel] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
+
+  // Estado para calificaciones
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [ratingCitaId, setRatingCitaId] = useState<string | null>(null);
+  const [ratingMedicoId, setRatingMedicoId] = useState<string | null>(null);
+  const [ratingValue, setRatingValue] = useState<number>(5);
+  const [ratingComentario, setRatingComentario] = useState<string>('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratingId, setRatingId] = useState<string | null>(null);
 
   const openCancelDialog = (citaId: string) => {
     setCitaToCancel(citaId);
@@ -292,7 +301,7 @@ export default function MisCitasPage() {
 
       // Intento de mitigación: verificar en el backend si la cita ya fue removida
       try {
-        const paciente_id = user?.paciente_id || user?.id;
+        const paciente_id = user?.paciente_id || user?.datos_personales?.id || user?.id;
         if (paciente_id) {
           const resp = await citasService.getCitasPaciente(String(paciente_id));
           const list = resp?.data?.citas ?? resp?.citas ?? resp?.data ?? resp ?? [];
@@ -319,6 +328,199 @@ export default function MisCitasPage() {
     } finally {
       setCanceling(false);
     }
+  };
+
+  // Enviar calificación al backend
+  const submitRating = async () => {
+    if (!ratingMedicoId || !ratingCitaId) {
+      toast({ title: 'Error', description: 'Falta información del médico o la cita.', variant: 'destructive' });
+      return;
+    }
+    setRatingSubmitting(true);
+    try {
+      const payload = {
+        medicoId: String(ratingMedicoId),
+        citaId: String(ratingCitaId),
+        puntuacion: Number(ratingValue),
+        comentario: ratingComentario || ''
+      };
+
+      // Si ya existe una calificación previa (ratingId), actualizamos
+      if (ratingId) {
+        const url = `http://localhost:3000/calificaciones/medicos/${ratingId}`;
+        const resp = await fetch(url, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ puntuacion: Number(ratingValue), comentario: ratingComentario || '' }),
+        });
+
+        if (!resp.ok) {
+          const txt = await resp.text();
+          throw new Error(txt || `HTTP ${resp.status}`);
+        }
+
+        toast({ title: 'Actualizado', description: 'Tu calificación fue actualizada correctamente.' , className: 'bg-emerald-50 border-emerald-200 text-emerald-900'});
+        // actualizar localmente el estado de la cita
+        setCitas((prev) => prev.map((c) => (String(c.id) === String(ratingCitaId) ? { ...c, calificado: true } : c)));
+        setRatingOpen(false);
+      } else {
+        // Crear nueva calificación
+        const resp = await fetch('http://localhost:3000/calificaciones/medicos', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!resp.ok) {
+          const txt = await resp.text();
+          throw new Error(txt || `HTTP ${resp.status}`);
+        }
+
+        // intentar obtener id de la calificación creada
+        try {
+          const created = await resp.json();
+          const createdId = created?.data?.id ?? created?.id ?? created?._id ?? null;
+          if (createdId) setRatingId(String(createdId));
+        } catch (e) {
+          // ignore parsing error
+        }
+
+        toast({ title: 'Gracias', description: 'Tu calificación fue enviada correctamente.' , className: 'bg-emerald-50 border-emerald-200 text-emerald-900'});
+
+        // Marcar la cita localmente como calificada para evitar duplicados visuales
+        setCitas((prev) => prev.map((c) => (String(c.id) === String(ratingCitaId) ? { ...c, calificado: true } : c)));
+        setRatingOpen(false);
+      }
+    } catch (err: any) {
+      console.error('Error enviando calificación:', err);
+      toast({ title: 'Error', description: err?.message || 'No se pudo enviar la calificación.', variant: 'destructive' });
+    } finally {
+      setRatingSubmitting(false);
+    }
+  };
+
+  // Cargar calificación existente del paciente para un médico (si existe)
+  const loadExistingRating = async (medicoId?: string | null, citaId?: string | null) => {
+    setRatingId(null);
+    if (!medicoId) return;
+    try {
+      const resp = await fetch('http://localhost:3000/calificaciones/mis-calificaciones?tipo=medicos', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        try { const txt = await resp.text(); console.warn('No se pudo obtener calificaciones:', txt); } catch (e) {}
+        return;
+      }
+      const data = await resp.json();
+      // El backend puede devolver estructura { data: { medicos: [...] } }
+      const list = data?.data?.medicos ?? data?.data?.calificaciones ?? data?.calificaciones ?? data?.data ?? data ?? [];
+      if (!Array.isArray(list)) return;
+      const found = list.find((it: any) => {
+        // Los objetos pueden venir como { medico: {...}, cita_id, puntuacion } o como { medico_id, cita_id }
+        const mid = it.medico?.id || it.medico_id || it.medicoId;
+        const cid = it.citaId || it.cita_id || it.cita;
+        if (!mid) return false;
+        if (String(mid) !== String(medicoId)) return false;
+        if (citaId && cid) return String(cid) === String(citaId);
+        return true;
+      });
+      if (found) {
+        // El id de la calificación puede estar en found.id
+        const foundId = found.id ?? found._id ?? found.calificacion_id ?? found.id_calificacion ?? null;
+        setRatingId(foundId ? String(foundId) : null);
+        // puntuacion a número (a veces viene como string)
+        const puntuacion = found.puntuacion ?? found.score ?? found.valor ?? null;
+        setRatingValue(puntuacion != null ? Number(puntuacion) : 5);
+        setRatingComentario(found.comentario ?? found.descripcion ?? found.obs ?? '');
+        // Marcar la cita localmente como calificada y guardar el valor para mostrar en el botón
+        try {
+          const score = puntuacion != null ? Number(puntuacion) : null;
+          if (citaId) {
+            setCitas((prev) => prev.map((c) => (String(c.id) === String(citaId) ? { ...c, calificado: true, calificacion_value: score } : c)));
+          }
+        } catch (e) {
+          // ignore
+        }
+      } else {
+        setRatingId(null);
+        setRatingValue(5);
+        setRatingComentario('');
+      }
+    } catch (e) {
+      console.error('Error cargando calificación existente:', e);
+    }
+  };
+
+  // Cargar todas las calificaciones del paciente para médicos y mapearlas a las citas
+  const loadAllRatings = async () => {
+    try {
+      const resp = await fetch('http://localhost:3000/calificaciones/mis-calificaciones?tipo=medicos', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        try { const txt = await resp.text(); console.warn('No se pudo obtener calificaciones (all):', txt); } catch (e) {}
+        return;
+      }
+      const data = await resp.json();
+      const list = data?.data?.medicos ?? data?.data?.calificaciones ?? data?.calificaciones ?? data?.data ?? data ?? [];
+      if (!Array.isArray(list)) return;
+
+      // Build a map by cita_id to rating
+      const byCita = new Map<string, any>();
+      list.forEach((it: any) => {
+        const cid = it.cita_id ?? it.citaId ?? it.cita ?? null;
+        if (!cid) return;
+        // prefer latest by fecha_creacion
+        const existing = byCita.get(String(cid));
+        const created = it.fecha_creacion ? new Date(it.fecha_creacion).getTime() : 0;
+        const existingCreated = existing?.fecha_creacion ? new Date(existing.fecha_creacion).getTime() : 0;
+        if (!existing || created >= existingCreated) {
+          byCita.set(String(cid), it);
+        }
+      });
+
+      // Merge into citas
+      setCitas((prev) => prev.map((c) => {
+        const found = byCita.get(String(c.id));
+        if (!found) return c;
+        const puntuacion = found.puntuacion ?? found.score ?? found.valor ?? null;
+        const foundId = found.id ?? found._id ?? found.calificacion_id ?? found.id_calificacion ?? null;
+        return { ...c, calificado: true, calificacion_value: puntuacion != null ? Number(puntuacion) : null, calificacion_id: foundId ? String(foundId) : null };
+      }));
+    } catch (e) {
+      console.error('Error cargando todas las calificaciones:', e);
+    }
+  };
+
+  // Cargar todas las calificaciones cuando cambien las citas (para mostrar valores en los botones inmediatamente)
+  useEffect(() => {
+    if (!user) return;
+    if (!Array.isArray(citas) || citas.length === 0) return;
+    loadAllRatings();
+  }, [citas.length, user?.id]);
+
+  // Asegurar que al cambiar a la pestaña 'COMPLETADAS' también carguemos las calificaciones
+  useEffect(() => {
+    if (!user) return;
+    if (activeTab !== 'COMPLETADAS') return;
+    if (!Array.isArray(citas) || citas.length === 0) return;
+    loadAllRatings();
+  }, [activeTab, citas.length, user?.id]);
+
+  const handleOpenRating = (c: any) => {
+    setRatingCitaId(String(c.id));
+    const mId = c.medico?.id || c.medico_id || null;
+    setRatingMedicoId(mId);
+    setRatingValue(5);
+    setRatingComentario('');
+    setRatingId(null);
+    setRatingOpen(true);
+    // cargar en background
+    loadExistingRating(mId, String(c.id));
   };
 
   const openDetails = (cita: any) => {
@@ -399,6 +601,8 @@ export default function MisCitasPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredCitas.length / pageSize));
   const paginatedCitas = filteredCitas.slice((page - 1) * pageSize, page * pageSize);
+
+  const currentRatingCita = ratingCitaId ? citas.find((x) => String(x.id) === String(ratingCitaId)) : null;
 
   // Cuando se abre el modal, cargar lista de médicos
   useEffect(() => {
@@ -539,7 +743,7 @@ export default function MisCitasPage() {
   }, [selectedMedicoId, open, modalidad, duracion]);
 
   const confirmarReserva = async () => {
-    console.log('🔍 Debug confirmarReserva:', { selectedSlot, selectedMedicoId, paciente_id: user?.paciente_id, user_id: user?.id });
+    console.log('🔍 Debug confirmarReserva:', { selectedSlot, selectedMedicoId, paciente_id: user?.paciente_id || user?.datos_personales?.id || user?.id, user_id: user?.id });
     
     if (!selectedSlot || !selectedMedicoId || !user?.id) {
       console.error('❌ Falta info:', { selectedSlot: !!selectedSlot, selectedMedicoId: !!selectedMedicoId, user_id: !!user?.id });
@@ -590,8 +794,8 @@ export default function MisCitasPage() {
         const paciente = await pacienteService.getByUsuarioId(String(user.id));
         if (paciente && paciente.id) pacienteIdToSend = paciente.id;
       } catch (e) {
-        // no encontrado, fallback a user.paciente_id o user.id
-        pacienteIdToSend = user?.paciente_id || String(user.id);
+        // no encontrado, fallback a user.paciente_id o datos_personales.id o user.id
+        pacienteIdToSend = user?.paciente_id || user?.datos_personales?.id || String(user.id);
       }
 
       const payload = {
@@ -939,13 +1143,31 @@ export default function MisCitasPage() {
                             Ver Detalles
                           </Button>
 
-                          {estado === 'AGENDADA' && (
-                            <button onClick={() => openCancelDialog(c.id)} className="text-sm text-rose-600">Cancelar</button>
-                          )}
+                                  {estado === 'AGENDADA' && (
+                                    <button onClick={() => openCancelDialog(c.id)} className="text-sm text-rose-600">Cancelar</button>
+                                  )}
 
-                          {estado === 'CONFIRMADA' && (
-                            <button onClick={() => startReprogram(c)} className="text-sm text-indigo-600">Reprogramar</button>
-                          )}
+                                  {estado === 'CONFIRMADA' && (
+                                    <button onClick={() => startReprogram(c)} className="text-sm text-indigo-600">Reprogramar</button>
+                                  )}
+
+                                  {esCompletada && (
+                                    c.calificado ? (
+                                      <button
+                                        onClick={() => handleOpenRating(c)}
+                                        className="text-sm text-emerald-600 underline"
+                                      >
+                                        {c.calificacion_value != null ? `Cambiar calificación — ${c.calificacion_value}★` : 'Cambiar calificación'}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleOpenRating(c)}
+                                        className="text-sm text-amber-700"
+                                      >
+                                        Calificar
+                                      </button>
+                                    )
+                                  )}
                         </div>
                       </div>
                     </div>
@@ -1082,6 +1304,53 @@ export default function MisCitasPage() {
                 )}
                 <DialogClose asChild>
                   <Button className="bg-blue-600 text-white hover:bg-blue-700">Cerrar</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog para calificar médico (solo citas completadas) */}
+          <Dialog open={ratingOpen} onOpenChange={(v) => { setRatingOpen(v); if (!v) { setRatingCitaId(null); setRatingMedicoId(null); } }}>
+            <DialogContent className="bg-white text-slate-900 max-w-md">
+              <DialogHeader>
+                <DialogTitle>Calificar Médico</DialogTitle>
+                <DialogDescription>Deja una puntuación y un comentario sobre tu experiencia.</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-2">
+                <div>
+                  <div className="text-xs text-slate-500">Médico</div>
+                  <div className="font-medium">{currentRatingCita ? (currentRatingCita.medico?.nombres ? `${currentRatingCita.medico.nombres} ${currentRatingCita.medico.apellidos || ''}` : (currentRatingCita.medico?.nombre || 'Médico')) : '—'}</div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-slate-500">Puntuación</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    {[1,2,3,4,5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setRatingValue(n)}
+                        className={`px-2 py-1 rounded ${ratingValue >= n ? 'bg-amber-400 text-white' : 'bg-slate-100 text-slate-700'}`}
+                        aria-label={`Puntuar ${n}`}
+                      >
+                        {n} ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-slate-500">Comentario (opcional)</div>
+                  <textarea className="w-full mt-1 h-24 p-2 border rounded-md border-slate-300" value={ratingComentario} onChange={(e) => setRatingComentario(e.target.value)} />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button onClick={submitRating} disabled={ratingSubmitting || !ratingMedicoId || !ratingCitaId}>
+                  {ratingSubmitting ? 'Enviando...' : (ratingId ? 'Actualizar Calificación' : 'Enviar Calificación')}
+                </Button>
+                <DialogClose asChild>
+                  <Button className="bg-blue-600 text-white hover:bg-blue-700">Cancelar</Button>
                 </DialogClose>
               </DialogFooter>
             </DialogContent>
