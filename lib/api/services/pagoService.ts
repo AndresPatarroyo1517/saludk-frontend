@@ -53,12 +53,12 @@ export interface ProcesarPagoSuscripcionResponse {
     message?: string;
     data: {
         data: {
-          ordenPago: {
-            id: string;
-            estado: string;
-            monto: number;
-            metodo_pago: string;
-          }; stripe?: { clientSecret: string; paymentIntentId: string; status: string; amount_usd: number; amount_cop: number; } | undefined; pse?: { referencia: string; mensaje: string; } | undefined; consignacion?: { referencia: string; banco: string; tipo_cuenta: string; numero_cuenta: string; titular: string; nit: string; monto: number; instrucciones: string; } | undefined;
+            ordenPago: {
+                id: string;
+                estado: string;
+                monto: number;
+                metodo_pago: string;
+            }; stripe?: { clientSecret: string; paymentIntentId: string; status: string; amount_usd: number; amount_cop: number; } | undefined; pse?: { referencia: string; mensaje: string; } | undefined; consignacion?: { referencia: string; banco: string; tipo_cuenta: string; numero_cuenta: string; titular: string; nit: string; monto: number; instrucciones: string; } | undefined;
         };
         ordenPago: {
             id: string;
@@ -166,6 +166,17 @@ export const pagoService = {
         const response = await apiClient.post(`/pagos/subir-comprobante/${ordenId}`);
         return response.data;
     },
+
+    confirmarCompra: async (compraId: string) => {
+        const response = await fetch(`/api/productos/compra/${compraId}/confirmar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        return response.json();
+    },
+
 
     // Simular pago PSE (desarrollo)
     simularPSE: async (ordenId: string) => {
