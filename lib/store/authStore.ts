@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import apiClient from '@/lib/api/client';
 
 // ============================================
-// INTERFACES COMPLETAS
+// INTERFACES (sin cambios)
 // ============================================
 export interface Direccion {
   id: string;
@@ -127,18 +128,19 @@ interface AuthState {
 }
 
 // ============================================
-// STORE DE ZUSTAND
+// STORE DE ZUSTAND (CORREGIDO)
 // ============================================
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
-      isInitialized: false,
+      isInitialized: false, // ✅ Siempre false al inicio
       isLoading: false,
       error: null,
 
       setAuth: (user) => {
+        console.log('✅ [authStore] Usuario autenticado:', user.email);
         set({
           user,
           isAuthenticated: true,
@@ -148,6 +150,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearAuth: () => {
+        console.log('🔴 [authStore] Sesión limpiada');
         set({
           user: null,
           isAuthenticated: false,
@@ -175,62 +178,61 @@ export const useAuthStore = create<AuthState>()(
       },
 
       /**
-       * Obtener datos del usuario desde el backend
+       * ✅ CORREGIDO: Usar apiClient en lugar de fetch directo
        */
       fetchUserData: async () => {
+        const state = get();
+        
+        // ✅ Prevenir llamadas duplicadas
+        if (state.isLoading) {
+          console.warn('⚠️ [authStore] fetchUserData ya en progreso, ignorando...');
+          return;
+        }
+
         try {
           set({ isLoading: true, error: null });
+          console.log('🔄 [authStore] Verificando sesión...');
 
-          const response = await fetch('/api/auth/me', {
-            method: 'GET',
-            credentials: 'include', // Enviar cookies (si usas httpOnly cookies)
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
+          // ✅ Usar apiClient que maneja cookies y refresh automáticamente
+          const response = await apiClient.get('/login/me');
 
-          if (!response.ok) {
-            if (response.status === 401) {
-              // No autenticado - limpiar estado
-              get().clearAuth();
-              throw new Error('Sesión expirada');
-            }
-            throw new Error('Error al obtener datos del usuario');
-          }
-
-          const data = await response.json();
-
-          if (data.success && data.usuario) {
+          if (response.data.success && response.data.usuario) {
+            console.log('✅ [authStore] Sesión válida:', response.data.usuario.email);
             set({
-              user: data.usuario,
+              user: response.data.usuario,
               isAuthenticated: true,
               isInitialized: true,
               isLoading: false,
               error: null
             });
           } else {
-            throw new Error('Respuesta inválida del servidor');
+            console.warn('⚠️ [authStore] Respuesta sin usuario');
+            get().clearAuth();
           }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-          set({
-            error: errorMessage,
-            isLoading: false,
-            isAuthenticated: false,
-            user: null
-          });
-          throw error;
+        } catch (error: any) {
+          console.error('❌ [authStore] Error al verificar sesión:', error);
+          
+          // ✅ Solo limpiar si es error 401 (no autenticado)
+          if (error.response?.status === 401) {
+            console.log('🔓 [authStore] Usuario no autenticado (401)');
+            get().clearAuth();
+          } else {
+            // ✅ Otros errores no limpian el estado
+            set({
+              error: error.message || 'Error al verificar sesión',
+              isLoading: false,
+              isInitialized: true
+            });
+          }
         }
       }
     }),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => localStorage), // Cambio a localStorage para persistencia real
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Persistir TODO el estado necesario
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        isInitialized: state.isInitialized
       })
     }
   )

@@ -30,7 +30,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user, fetchUserData, isLoading, error } = useAuthStore();
+  const { user, isLoading, error } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({
     proximasCitas: 0,
     historialItems: 0,
@@ -41,24 +41,13 @@ export default function DashboardPage() {
     consultasPresencialesDisponibles: 0
   });
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        // Solo hacer fetch si no hay usuario cargado
-        if (!user) {
-          await fetchUserData();
-        }
-      } catch (error) {
-        console.error('Error cargando datos del dashboard:', error);
-      }
-    };
-
-    loadDashboardData();
-  }, []); // Solo ejecutar una vez al montar
+  // ✅ ELIMINADO: No hacer fetch aquí, ProtectedRoute ya lo maneja
 
   useEffect(() => {
-    // Calcular estadísticas cuando el usuario cambie
+    // ✅ Calcular estadísticas cuando el usuario cambie
     if (user) {
+      console.log('📊 [Dashboard] Calculando estadísticas para:', user.email);
+      
       const proximasCitas = user.proximas_citas?.length || 0;
 
       const historialItems = user.historial_medico
@@ -88,7 +77,7 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  // Estado de carga
+  // ✅ Estado de carga (manejado por ProtectedRoute)
   if (isLoading) {
     return (
       <ProtectedRoute allowedRoles={['paciente']}>
@@ -109,7 +98,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Estado de error
+  // ✅ Estado de error
   if (error) {
     return (
       <ProtectedRoute allowedRoles={['paciente']}>

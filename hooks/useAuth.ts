@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/lib/store/authStore';
 import authService from '@/lib/api/services/loginService';
 
@@ -9,37 +9,36 @@ export function useAuth() {
     isInitialized,
     setAuth, 
     clearAuth, 
-    setInitialized 
+    fetchUserData,
+    isLoading
   } = useAuthStore();
 
+  // ✅ Usar ref para evitar llamadas duplicadas
+  const isChecking = useRef(false);
+
   useEffect(() => {
-    if (isInitialized) {
+    // ✅ No verificar si ya inicializó o está verificando
+    if (isInitialized || isChecking.current) {
       return;
     }
 
     const checkAuth = async () => {
+      isChecking.current = true;
+      console.log('🔄 [useAuth] Iniciando verificación de sesión...');
+      
       try {
-        const response = await authService.me();
-        
-        if (response.success && response.usuario) {
-          setAuth(response.usuario);
-        } else {
-          clearAuth();
-        }
-      } catch (error: any) {
-        if (error.response?.status === 401) {
-          clearAuth();
-        } else {
-          console.error('Error al verificar autenticación:', error);
-          clearAuth();
-        }
+        await fetchUserData();
+      } catch (error) {
+        console.error('❌ [useAuth] Error al verificar autenticación:', error);
+        // ✅ Si falla, marcar como inicializado de todas formas
+        useAuthStore.getState().setInitialized(true);
       } finally {
-        setInitialized(true);
+        isChecking.current = false;
       }
     };
 
     checkAuth();
-  }, [isInitialized, setAuth, clearAuth, setInitialized]);
+  }, [isInitialized, fetchUserData]); // ✅ Solo depender de isInitialized
 
   const login = useCallback(async (
     email: string, 
@@ -47,9 +46,11 @@ export function useAuth() {
     rememberMe = false
   ) => {
     try {
+      console.log('🔑 [useAuth] Intentando login...');
       const response = await authService.login({ email, password, rememberMe });
       
       if (response.success && response.usuario) {
+        console.log('✅ [useAuth] Login exitoso:', response.usuario.email);
         setAuth(response.usuario);
         
         return {
@@ -61,15 +62,18 @@ export function useAuth() {
       
       return response;
     } catch (error) {
+      console.error('❌ [useAuth] Error en login:', error);
       throw error;
     }
   }, [setAuth]);
 
   const logout = useCallback(async () => {
     try {
+      console.log('🚪 [useAuth] Cerrando sesión...');
       await authService.logout();
+      console.log('✅ [useAuth] Logout exitoso');
     } catch (error) {
-      console.error('Error en logout:', error);
+      console.error('❌ [useAuth] Error en logout:', error);
     } finally {
       clearAuth();
     }
@@ -79,6 +83,7 @@ export function useAuth() {
     user,
     isAuthenticated,
     isInitialized,
+    isLoading,
     login,
     logout,
   };

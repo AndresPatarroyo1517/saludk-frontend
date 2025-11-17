@@ -12,43 +12,45 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isInitialized } = useAuth();
+  const { user, isAuthenticated, isInitialized, isLoading } = useAuth();
   const router = useRouter();
   const redirected = useRef(false);
 
   useEffect(() => {
-    // ✅ Solo depender de isInitialized e isAuthenticated
     if (!isInitialized || redirected.current) {
       return;
     }
 
-    // Usuario no autenticado
+    console.log('🔒 [ProtectedRoute] Verificando acceso:', {
+      isAuthenticated,
+      user: user?.email,
+      rol: user?.rol,
+      allowedRoles
+    });
+
     if (!isAuthenticated || !user) {
       redirected.current = true;
-      console.log('❌ No autenticado, redirigiendo a /login');
+      console.log('❌ [ProtectedRoute] No autenticado, redirigiendo a /login');
       router.replace('/login');
       return;
     }
 
-    // ✅ Verificar roles solo si allowedRoles está definido
     if (allowedRoles && allowedRoles.length > 0) {
       const normalizedRole = user.rol.toLowerCase() as UserRole;
       
       if (!allowedRoles.includes(normalizedRole)) {
         redirected.current = true;
         const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
-        console.log(`❌ Rol ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
+        console.log(`❌ [ProtectedRoute] Rol ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
         router.replace(targetRoute);
         return;
       }
     }
 
-    console.log('✅ Acceso permitido:', user.email, '| Rol:', user.rol);
-  }, [isInitialized, isAuthenticated]); 
-  // ✅ user, allowedRoles y router son estables, no causan re-renders
+    console.log('✅ [ProtectedRoute] Acceso permitido:', user.email, '| Rol:', user.rol);
+  }, [isInitialized, isAuthenticated, user, allowedRoles, router]);
 
-  // Mostrar loader mientras inicializa
-  if (!isInitialized) {
+  if (!isInitialized || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-teal-50">
         <div className="text-center">
@@ -59,7 +61,6 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     );
   }
 
-  // Si no autenticado o sin permisos, no mostrar nada (ya se redirigió)
   if (!isAuthenticated || !user) {
     return null;
   }
