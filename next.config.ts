@@ -8,7 +8,18 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'via.placeholder.com',
+        hostname: 'www.lasanteca.com',
+        pathname: '/userfiles/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'th.bing.com',
+        pathname: '/th/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'drogueriaalamedasur.co',
+        pathname: '/wp-content/**',
       },
     ],
   },
