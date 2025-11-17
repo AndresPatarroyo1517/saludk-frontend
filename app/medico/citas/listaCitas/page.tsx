@@ -42,7 +42,7 @@ export default function ListaCitas() {
 
             <button
                 onClick={() => router.back()}
-                className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition"
+                className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition cursor-pointer"
             >
                 Volver
             </button>

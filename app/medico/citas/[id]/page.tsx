@@ -5,6 +5,9 @@ import { useCitasStore, CitaAgendada } from '@/lib/store/citasStore';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogPanel, DialogTitle, Description, DialogBackdrop } from '@headlessui/react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import citasService from '@/lib/api/services/citasService';
 
 export default function DetalleCita() {
@@ -40,29 +43,30 @@ export default function DetalleCita() {
             setModalConfirmOpen(true);
         } catch (e) {
             console.error(e);
-            alert(`Error al actualizar el estado a ${nuevoEstado}`);
+            toast.error(`Error al actualizar el estado a ${nuevoEstado}`, { duration: 4000 });
         }
     };
 
+    // Auto cierre modal
     useEffect(() => {
         let timer: NodeJS.Timeout;
         if (modalConfirmOpen) {
             timer = setTimeout(() => {
                 setModalConfirmOpen(false);
-                router.push('/medico'); // Navega automáticamente después de 5s
+                router.push('/medico');
             }, 3500);
         }
-        return () => clearTimeout(timer); // Limpiar el timeout si se cierra antes
+        return () => clearTimeout(timer);
     }, [modalConfirmOpen, router]);
 
     const handleConfirmClose = () => {
         setModalConfirmOpen(false);
-        router.push('/medico'); // Redirige al listado
+        router.push('/medico');
     };
 
     return (
         <div className="grid h-full w-full gap-4 p-2 grid-cols-4 grid-rows-2">
-            {/* Detalle de Cita */}
+            {/* DETALLE CITA */}
             <div className="col-span-2 row-span-2 bg-linear-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg p-4 overflow-auto">
                 <Card className="mb-4 border-none shadow-none bg-transparent">
                     <CardHeader>
@@ -78,57 +82,80 @@ export default function DetalleCita() {
                 </Card>
             </div>
 
-            {/* Botón Historial Médico */}
+            {/* HISTORIAL */}
             <div className="col-span-2 row-span-1 bg-linear-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg flex items-center justify-center p-4">
                 <button
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition cursor-pointer"
-                    onClick={() => alert('Abrir historial médico (modal o página)')}
+                    onClick={() => alert('Abrir historial médico')}
                 >
                     Ver Historial Médico
                 </button>
             </div>
 
-            {/* Botones de acción */}
-            <div className="col-span-2 row-span-1 bg-linear-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg flex items-center justify-end gap-3 p-4">
-                {cita.estado === 'AGENDADA' && (
+            {/* BOTONES ACCIÓN */}
+            <div className="col-span-2 row-span-1 bg-linear-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg flex flex-col justify-center gap-3 p-4">
+                <div className="flex justify-end gap-3">
+                    {cita.estado === 'AGENDADA' && (
+                        <button
+                            onClick={() =>
+                                actualizarEstado('CONFIRMADA', 'La cita ha sido confirmada exitosamente.')
+                            }
+                            className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition cursor-pointer"
+                        >
+                            Confirmar Cita
+                        </button>
+                    )}
+
+                    {cita.estado === 'CONFIRMADA' && (
+                        <>
+                            <button
+                                onClick={() => {
+                                    const fechaCita = new Date(cita.fecha);
+                                    const ahora = new Date();
+
+                                    if (fechaCita > ahora) {
+                                        toast.error(
+                                            'No se puede completar la cita antes de la fecha y hora programadas.',
+                                            { duration: 4000 }
+                                        );
+                                        return;
+                                    }
+
+                                    actualizarEstado('COMPLETADA', 'La cita ha sido completada exitosamente.');
+                                }}
+                                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition cursor-pointer"
+                            >
+                                Completar Cita
+                            </button>
+
+                            <button
+                                onClick={() =>
+                                    actualizarEstado('NO_ASISTIO', 'Se ha registrado que el paciente no asistió.')
+                                }
+                                className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition cursor-pointer"
+                            >
+                                No Asistió
+                            </button>
+                        </>
+                    )}
+
                     <button
-                        onClick={() => actualizarEstado('CONFIRMADA', 'La cita ha sido confirmada exitosamente.')}
-                        className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition cursor-pointer"
+                        onClick={() => router.back()}
+                        className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition cursor-pointer"
                     >
-                        Confirmar Cita
+                        Volver a la lista
                     </button>
-                )}
-                {cita.estado === 'CONFIRMADA' && (
-                    <>
-                        <button
-                            onClick={() => actualizarEstado('COMPLETADA', 'La cita ha sido completada exitosamente.')}
-                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition cursor-pointer"
-                        >
-                            Completar Cita
-                        </button>
-                        <button
-                            onClick={() => actualizarEstado('NO_ASISTIO', 'Se ha registrado que el paciente no asistió.')}
-                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition cursor-pointer"
-                        >
-                            No Asistió
-                        </button>
-                    </>
-                )}
-                <button
-                    onClick={() => router.back()}
-                    className="px-3 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition cursor-pointer"
-                >
-                    Volver a la lista
-                </button>
+                </div>
             </div>
 
-            {/* Modal de confirmación */}
+            {/* MODAL CONFIRMACIÓN */}
             <Dialog open={modalConfirmOpen} onClose={() => setModalConfirmOpen(false)} className="relative z-50">
                 <DialogBackdrop className="fixed inset-0 bg-black/30" />
                 <div className="fixed inset-0 flex items-center justify-center p-4">
                     <DialogPanel className="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 text-center space-y-4">
-                        <DialogTitle className="text-lg font-semibold">¡Acción completada!</DialogTitle>
+                        <DialogTitle className="text-lg font-semibold">Acción completada</DialogTitle>
                         <Description className="text-sm text-slate-500">{mensajeConfirm}</Description>
+
                         <button
                             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                             onClick={handleConfirmClose}
