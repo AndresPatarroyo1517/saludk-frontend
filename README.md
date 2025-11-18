@@ -147,7 +147,7 @@ saludk-backend/
 ### Base URL
 
 ```
-http://https://saludk-backend.vercel.app/api/v1
+http://http://localhost:3000/api/v1
 ```
 
 ### Endpoints

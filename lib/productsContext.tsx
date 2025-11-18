@@ -11,7 +11,7 @@ export function ProductsProvider({ children }: { children: React.ReactNode }) {
     async function fetchProducts() {
       try {
         // 👇 Ajusta esta URL según tu backend o API Route real
-        const res = await fetch('https://saludk-backend.vercel.app/productos');
+        const res = await fetch('http://localhost:3000/productos');
         const data = await res.json();
 
         if (data.success && Array.isArray(data.data)) {
