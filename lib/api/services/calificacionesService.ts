@@ -18,6 +18,15 @@ export const calificacionesService = {
     const response = await apiClient.post('/calificaciones/producto', data);
     return response.data;
   },
+
+  getCalificacionesGenerales: async (tipo: string) => {
+    const data = {
+      tipo: tipo // medicos o productos
+    };
+    const response = await apiClient.get(`/calificaciones/mis-calificaciones`, { params: data });
+    return response.data;
+  },
+
 };
 
 export default calificacionesService;
