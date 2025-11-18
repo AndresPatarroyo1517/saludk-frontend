@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/lib/store/authStore';
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://saludk-backend.vercel.app',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3000',
   headers: {
     'Content-Type': 'application/json',
   },
