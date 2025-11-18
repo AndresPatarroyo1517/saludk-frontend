@@ -71,7 +71,8 @@ interface Compra {
   productos: ProductoCompra[];
 }
 
-interface ComprasResponse {
+// ✅ Respuesta obtener compras
+export interface ObtenerMisComprasResponse {
   success: boolean;
   data: {
     compras: Compra[];
@@ -104,12 +105,12 @@ export default function HistorialComprasPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const response: ComprasResponse = await pagoService.obtenerMisCompras({ limit: 100 });
+      const response: any = await pagoService.obtenerMisCompras({ limit: 100 });
 
       if (response.success) {
         // ✅ Filtrar CARRITO - no es parte del historial de compras reales
         const comprasValidas = response.data.compras.filter(
-          (compra) => compra.estado !== 'CARRITO'
+          (compra: any) => compra.estado !== 'CARRITO'
         );
         setCompras(comprasValidas);
       }

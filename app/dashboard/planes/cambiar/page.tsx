@@ -191,7 +191,7 @@ export default function CambiarPlanPage() {
 
       console.log('✅ [PASO 3] Respuesta completa:', response);
       
-      const responseData = response.data.data || response.data;
+      const responseData = response.data;
       
       console.log('📦 [PASO 3] Data extraída:', responseData);
 

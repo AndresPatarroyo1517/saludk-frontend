@@ -258,7 +258,7 @@ export default function InfoPage() {
                             <p className="text-sm text-slate-600">Tratamiento: {enfermedad.tratamiento}</p>
                           </div>
                           <Badge variant="outline">
-                            Desde {new Date(enfermedad.desde).toLocaleDateString('es-ES')}
+                            {enfermedad.desde ? `Desde ${new Date(enfermedad.desde).toLocaleDateString('es-ES')}` : 'Fecha no disponible'}
                           </Badge>
                         </div>
                       </div>
