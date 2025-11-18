@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useRouter } from 'next/navigation';
 
 interface Cita {
   id: string;
@@ -48,6 +49,7 @@ interface Disponibilidad {
 }
 
 export default function MedicoHome() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const { stats, setStats } = useCitasStore();
   const [loading, setLoading] = useState(true);
@@ -330,7 +332,7 @@ export default function MedicoHome() {
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button className='cursor-pointer' variant="outline" size="sm" onClick={() => router.push(`/medico/citas/${cita.id}`)}>
                       Ver Detalles
                     </Button>
                   </div>

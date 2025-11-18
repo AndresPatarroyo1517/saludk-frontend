@@ -6,7 +6,7 @@ import { AlertCircle, Stethoscope, Pill, User, Edit } from 'lucide-react';
 
 interface HistorialMedicoViewProps {
   historial: HistorialMedico;
-  onEdit: () => void;
+  onEdit?: () => void;
 }
 
 export default function HistorialMedicoView({ historial, onEdit }: HistorialMedicoViewProps) {
@@ -23,15 +23,17 @@ export default function HistorialMedicoView({ historial, onEdit }: HistorialMedi
                   {historial.paciente.nombres} {historial.paciente.apellidos}
                 </CardTitle>
                 <p className="text-green-700">
-                  ID: {historial.paciente.numero_identificacion} | 
+                  ID: {historial.paciente.numero_identificacion} |
                   Tipo de sangre: {historial.paciente.tipo_sangre}
                 </p>
               </div>
             </div>
-            <Button onClick={onEdit} className="flex items-center space-x-2">
-              <Edit className="w-4 h-4" />
-              <span>Editar Historial</span>
-            </Button>
+            {onEdit &&
+              <Button onClick={onEdit} className="flex items-center space-x-2">
+                <Edit className="w-4 h-4" />
+                <span>Editar Historial</span>
+              </Button>
+            }
           </div>
         </CardHeader>
       </Card>
@@ -52,7 +54,7 @@ export default function HistorialMedicoView({ historial, onEdit }: HistorialMedi
             <div key={index} className="p-4 border border-slate-200 rounded-lg bg-white">
               <div className="flex justify-between items-start mb-2">
                 <h4 className="font-semibold text-slate-800 text-lg">{enfermedad.nombre}</h4>
-                <Badge 
+                <Badge
                   variant={enfermedad.estado === 'controlada' ? 'default' : 'destructive'}
                 >
                   {enfermedad.estado}

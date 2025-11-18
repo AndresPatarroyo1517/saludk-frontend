@@ -6,6 +6,7 @@ export interface CitaAgendada{
   estado: "AGENDADA" | "CONFIRMADA" | "CANCELADA" | string;
   modalidad: "VIRTUAL" | "PRESENCIAL" | string;
   paciente: string;
+  id_paciente: string;
 }
 
 export interface EstadisticasMedicoData {

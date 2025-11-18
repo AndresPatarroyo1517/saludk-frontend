@@ -5,10 +5,10 @@ import { useCitasStore, CitaAgendada } from '@/lib/store/citasStore';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogPanel, DialogTitle, Description, DialogBackdrop } from '@headlessui/react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import citasService from '@/lib/api/services/citasService';
+import { HistorialMedico, historialMedicoService } from '@/lib/api/services/historialMedicoService';
+import HistorialMedicoView from '@/components/HistorialMedicoView';
 
 export default function DetalleCita() {
     const { id } = useParams();
@@ -21,6 +21,9 @@ export default function DetalleCita() {
 
     const [modalConfirmOpen, setModalConfirmOpen] = useState(false);
     const [mensajeConfirm, setMensajeConfirm] = useState('');
+
+    const [modalHistorialOpen, setModalHistorialOpen] = useState(false);
+    const [historialMedico, setHistorialMedico] = useState<HistorialMedico | null>(null);
 
     if (!cita) {
         return (
@@ -64,6 +67,23 @@ export default function DetalleCita() {
         router.push('/medico');
     };
 
+    const handleVerHistorialMedico = async () => {
+        try {
+            const pacienteId = cita.id_paciente;
+            const response = await historialMedicoService.obtenerHistorialPaciente(pacienteId);
+            setHistorialMedico(response.data);
+            setModalHistorialOpen(true);
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al cargar el historial médico', { duration: 3500 });
+        }
+    };
+
+    const handleCloseHistorial = () => {
+        setModalHistorialOpen(false);
+        setHistorialMedico(null);
+    };
+
     return (
         <div className="grid h-full w-full gap-4 p-2 grid-cols-4 grid-rows-2">
             {/* DETALLE CITA */}
@@ -86,7 +106,7 @@ export default function DetalleCita() {
             <div className="col-span-2 row-span-1 bg-linear-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg flex items-center justify-center p-4">
                 <button
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition cursor-pointer"
-                    onClick={() => alert('Abrir historial médico')}
+                    onClick={handleVerHistorialMedico}
                 >
                     Ver Historial Médico
                 </button>
@@ -162,6 +182,36 @@ export default function DetalleCita() {
                         >
                             Cerrar
                         </button>
+                    </DialogPanel>
+                </div>
+            </Dialog>
+
+            {/* === MODAL HISTORIAL MÉDICO === */}
+            <Dialog open={modalHistorialOpen} onClose={handleCloseHistorial} className="relative z-50">
+                <DialogBackdrop className="fixed inset-0 bg-black/30" />
+
+                <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+                    <DialogPanel className="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+                        <DialogTitle className="text-lg font-semibold mb-4">
+                            Historial Médico
+                        </DialogTitle>
+
+                        {historialMedico ? (
+                            <HistorialMedicoView
+                                historial={historialMedico}
+                            />
+                        ) : (
+                            <p className="text-center text-slate-500">Cargando...</p>
+                        )}
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={handleCloseHistorial}
+                                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition cursor-pointer"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
                     </DialogPanel>
                 </div>
             </Dialog>
