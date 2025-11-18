@@ -366,7 +366,7 @@ export default function MisCitasPage() {
         setRatingOpen(false);
       } else {
         // Crear nueva calificación
-        const resp = await fetch('http://https://saludk-backend.vercel.app//calificaciones/medicos', {
+        const resp = await fetch('http://https://saludk-backend.vercel.app/calificaciones/medicos', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -406,7 +406,7 @@ export default function MisCitasPage() {
     setRatingId(null);
     if (!medicoId) return;
     try {
-      const resp = await fetch('http://https://saludk-backend.vercel.app//calificaciones/mis-calificaciones?tipo=medicos', {
+      const resp = await fetch('http://https://saludk-backend.vercel.app/calificaciones/mis-calificaciones?tipo=medicos', {
         method: 'GET',
         credentials: 'include',
       });
@@ -457,7 +457,7 @@ export default function MisCitasPage() {
   // Cargar todas las calificaciones del paciente para médicos y mapearlas a las citas
   const loadAllRatings = async () => {
     try {
-      const resp = await fetch('http://https://saludk-backend.vercel.app//calificaciones/mis-calificaciones?tipo=medicos', {
+      const resp = await fetch('http://https://saludk-backend.vercel.app/calificaciones/mis-calificaciones?tipo=medicos', {
         method: 'GET',
         credentials: 'include',
       });
