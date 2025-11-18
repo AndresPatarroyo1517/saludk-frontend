@@ -1,18 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { 
-  historialMedicoService, 
-  Paciente, 
-  HistorialMedico as HistorialMedicoType 
+import {
+  historialMedicoService,
+  Paciente,
+  HistorialMedico as HistorialMedicoType
 } from '@/lib/api/services/historialMedicoService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Loader2, 
-  AlertCircle, 
+import {
+  Loader2,
+  AlertCircle,
   FileText,
   User,
   Plus
@@ -57,7 +57,7 @@ export default function PruebaPage() {
       setError(null);
       const paciente = pacientes.find(p => p.id === pacienteId);
       setPacienteSeleccionado(paciente || null);
-      
+
       const response = await historialMedicoService.obtenerHistorialPaciente(pacienteId);
       setHistorialSeleccionado(response.data);
       setModo('vista');
@@ -91,21 +91,27 @@ export default function PruebaPage() {
     try {
       setLoadingHistorial(true);
       setError(null);
-      
+
       if (!pacienteSeleccionado) return;
 
       const response = await historialMedicoService.upsertHistorialCompleto(
         pacienteSeleccionado.id,
         historialData
       );
-      
+
       setHistorialSeleccionado(response.data);
       setModo('vista');
-      
+
       // Actualizar la lista de pacientes para reflejar los cambios
-      const updatedPacientes = pacientes.map(p => 
-        p.id === pacienteSeleccionado.id 
-          ? { ...p, historial_medico: { ...p.historial_medico, enfermedades_cronicas: historialData.enfermedades_cronicas } }
+      const updatedPacientes = pacientes.map(p =>
+        p.id === pacienteSeleccionado.id
+          ? {
+            ...p,
+            historial_medico: {
+              ...(p.historial_medico || { id: '' }), // Provide default values if historial_medico is undefined
+              enfermedades_cronicas: historialData.enfermedades_cronicas
+            }
+          }
           : p
       );
       setPacientes(updatedPacientes);
@@ -210,7 +216,7 @@ export default function PruebaPage() {
               </CardContent>
             </Card>
           ) : modo === 'vista' && historialSeleccionado ? (
-            <HistorialMedicoView 
+            <HistorialMedicoView
               historial={historialSeleccionado}
               onEdit={handleEditarHistorial}
             />
@@ -232,10 +238,9 @@ export default function PruebaPage() {
                   <p className="text-orange-600 mt-2">
                     Este paciente no tiene un historial médico registrado
                   </p>
-                  <Button 
-                    className="mt-4" 
+                  <Button
+                    className="mt-4"
                     onClick={handleCrearHistorial}
-                    className="flex items-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Crear Historial</span>

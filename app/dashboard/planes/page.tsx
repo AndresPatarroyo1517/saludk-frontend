@@ -12,7 +12,7 @@ import { CheckCircle, Loader2, Sparkles, AlertCircle, RefreshCw, ArrowLeft } fro
 import { toast } from 'sonner';
 import { useAuthStore } from '@/lib/store/authStore';
 import { planesService } from '@/lib/api/services/planesService';
-import pagoService from '@/lib/api/services/pagoService';
+import pagoService, { Suscripcion } from '@/lib/api/services/pagoService';
 
 interface Plan {
   id: string;
@@ -24,13 +24,6 @@ interface Plan {
   beneficios: string[];
   consultas_virtuales_incluidas: string;
   consultas_presenciales_incluidas: string;
-}
-
-interface Suscripcion {
-  id: string;
-  plan_id: string;
-  estado: string;
-  plan: Plan;
 }
 
 export default function PlanesPage() {

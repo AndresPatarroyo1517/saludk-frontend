@@ -195,7 +195,7 @@ export default function InfoPage() {
                 <div>
                   <label className="text-sm font-medium text-slate-700">Alergias</label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {user.datos_personales.alergias.map((alergia, index) => (
+                    {user.datos_personales.alergias.map((alergia: any, index: number) => (
                       <Badge key={index} variant="secondary" className="bg-red-100 text-red-800">
                         {alergia}
                       </Badge>
@@ -209,7 +209,7 @@ export default function InfoPage() {
                 <div>
                   <label className="text-sm font-medium text-slate-700">Direcciones</label>
                   <div className="space-y-3 mt-2">
-                    {user.datos_personales.direcciones.map((direccion) => (
+                    {user.datos_personales.direcciones.map((direccion: any) => (
                       <div key={direccion.id} className="p-3 border rounded-lg">
                         <div className="flex items-start space-x-2">
                           <MapPin className="w-4 h-4 text-slate-500 mt-0.5" />
@@ -249,17 +249,23 @@ export default function InfoPage() {
                 {user.historial_medico?.enfermedades_cronicas && 
                  user.historial_medico.enfermedades_cronicas.length > 0 ? (
                   <div className="space-y-3">
-                    {user.historial_medico.enfermedades_cronicas.map((enfermedad, index) => (
+                    {(user.historial_medico.enfermedades_cronicas as any[]).map((enfermedad: any, index: number) => (
                       <div key={index} className="p-3 border rounded-lg">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium">{enfermedad.nombre}</p>
-                            <p className="text-sm text-slate-600">Estado: {enfermedad.estado}</p>
-                            <p className="text-sm text-slate-600">Tratamiento: {enfermedad.tratamiento}</p>
+                            <p className="font-medium">{enfermedad.nombre || enfermedad}</p>
+                            {enfermedad.estado && (
+                              <p className="text-sm text-slate-600">Estado: {enfermedad.estado}</p>
+                            )}
+                            {enfermedad.tratamiento && (
+                              <p className="text-sm text-slate-600">Tratamiento: {enfermedad.tratamiento}</p>
+                            )}
                           </div>
-                          <Badge variant="outline">
-                            {enfermedad.desde ? `Desde ${new Date(enfermedad.desde).toLocaleDateString('es-ES')}` : 'Fecha no disponible'}
-                          </Badge>
+                          {(enfermedad.desde) && (
+                            <Badge variant="outline">
+                              {enfermedad.desde ? `Desde ${new Date(enfermedad.desde).toLocaleDateString('es-ES')}` : 'Fecha no disponible'}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -275,14 +281,20 @@ export default function InfoPage() {
                 {user.historial_medico?.cirugias_previas && 
                  user.historial_medico.cirugias_previas.length > 0 ? (
                   <div className="space-y-3">
-                    {user.historial_medico.cirugias_previas.map((cirugia, index) => (
+                    {(user.historial_medico.cirugias_previas as any[]).map((cirugia: any, index: number) => (
                       <div key={index} className="p-3 border rounded-lg">
-                        <p className="font-medium">{cirugia.nombre}</p>
-                        <p className="text-sm text-slate-600">Hospital: {cirugia.hospital}</p>
-                        <p className="text-sm text-slate-600">
-                          Fecha: {new Date(cirugia.fecha).toLocaleDateString('es-ES')}
-                        </p>
-                        <p className="text-sm text-slate-600">Complicaciones: {cirugia.complicaciones}</p>
+                        <p className="font-medium">{cirugia.nombre || cirugia}</p>
+                        {cirugia.hospital && (
+                          <p className="text-sm text-slate-600">Hospital: {cirugia.hospital}</p>
+                        )}
+                        {cirugia.fecha && (
+                          <p className="text-sm text-slate-600">
+                            Fecha: {new Date(cirugia.fecha).toLocaleDateString('es-ES')}
+                          </p>
+                        )}
+                        {cirugia.complicaciones && (
+                          <p className="text-sm text-slate-600">Complicaciones: {cirugia.complicaciones}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -297,18 +309,26 @@ export default function InfoPage() {
                 {user.historial_medico?.medicamentos_actuales && 
                  user.historial_medico.medicamentos_actuales.length > 0 ? (
                   <div className="space-y-3">
-                    {user.historial_medico.medicamentos_actuales.map((medicamento, index) => (
+                    {(user.historial_medico.medicamentos_actuales as any[]).map((medicamento: any, index: number) => (
                       <div key={index} className="p-3 border rounded-lg">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium">{medicamento.nombre}</p>
-                            <p className="text-sm text-slate-600">Dosis: {medicamento.dosis}</p>
-                            <p className="text-sm text-slate-600">Frecuencia: {medicamento.frecuencia}</p>
-                            <p className="text-sm text-slate-600">Prescrito por: {medicamento.prescrito_por}</p>
+                            <p className="font-medium">{medicamento.nombre || medicamento}</p>
+                            {medicamento.dosis && (
+                              <p className="text-sm text-slate-600">Dosis: {medicamento.dosis}</p>
+                            )}
+                            {medicamento.frecuencia && (
+                              <p className="text-sm text-slate-600">Frecuencia: {medicamento.frecuencia}</p>
+                            )}
+                            {medicamento.prescrito_por && (
+                              <p className="text-sm text-slate-600">Prescrito por: {medicamento.prescrito_por}</p>
+                            )}
                           </div>
-                          <Badge variant="outline">
-                            Desde {new Date(medicamento.desde).toLocaleDateString('es-ES')}
-                          </Badge>
+                          {medicamento.desde && (
+                            <Badge variant="outline">
+                              Desde {new Date(medicamento.desde).toLocaleDateString('es-ES')}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -339,21 +359,21 @@ export default function InfoPage() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-slate-600">Plan:</span>
-                        <span className="font-medium">{user.plan_activo.plan.nombre}</span>
+                        <span className="font-medium">{user.plan_activo?.plan?.nombre || 'Sin plan activo'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Estado:</span>
-                        <Badge variant={user.plan_activo.estado === 'ACTIVA' ? 'default' : 'secondary'}>
-                          {user.plan_activo.estado}
+                        <Badge variant={user.plan_activo?.estado === 'ACTIVA' ? 'default' : 'secondary'}>
+                          {user.plan_activo?.estado}
                         </Badge>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Fecha Inicio:</span>
-                        <span>{new Date(user.plan_activo.fecha_inicio).toLocaleDateString('es-ES')}</span>
+                        <span>{new Date(user.plan_activo?.fecha_inicio).toLocaleDateString('es-ES')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Fecha Vencimiento:</span>
-                        <span>{new Date(user.plan_activo.fecha_vencimiento).toLocaleDateString('es-ES')}</span>
+                        <span>{new Date(user.plan_activo?.fecha_vencimiento).toLocaleDateString('es-ES')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Auto Renovable:</span>
@@ -391,7 +411,7 @@ export default function InfoPage() {
                 <div className="mt-6">
                   <h4 className="font-medium text-slate-800 mb-3">Beneficios Incluidos</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {user.plan_activo.plan.beneficios.map((beneficio, index) => (
+                    {user.plan_activo?.plan?.beneficios.map((beneficio: any, index: number) => (
                       <div key={index} className="flex items-center space-x-2 p-2 bg-slate-50 rounded">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span className="text-sm">{beneficio}</span>
@@ -417,7 +437,7 @@ export default function InfoPage() {
             <CardContent>
               {user.ordenes_pago && user.ordenes_pago.length > 0 ? (
                 <div className="space-y-3">
-                  {user.ordenes_pago.map((orden) => (
+                  {user.ordenes_pago.map((orden: any) => (
                     <div key={orden.id} className="p-4 border rounded-lg">
                       <div className="flex justify-between items-start">
                         <div>

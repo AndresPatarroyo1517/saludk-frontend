@@ -391,7 +391,7 @@ export default function MedicoHome() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {user.disponibilidades.map((disp: Disponibilidad) => {
+                {user.disponibilidades?.map((disp: any) => {
                   const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
                   return (
                     <div key={disp.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">

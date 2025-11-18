@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner';
 import MetodoPagoSelector from '@/components/checkout/MetodoPagoSelector';
 import StripeCheckout from '@/components/checkout/StripeCheckout';
-import pagoService from '@/lib/api/services/pagoService';
+import pagoService, { Suscripcion } from '@/lib/api/services/pagoService';
 import { planesService } from '@/lib/api/services/planesService';
 
 // ✅ CORREGIDO: Añadir beneficios a la interfaz Plan
@@ -35,15 +35,6 @@ interface Plan {
   precio_mensual: string;
   duracion_meses: string;
   beneficios: string[]; // ✅ AÑADIDO
-}
-
-interface Suscripcion {
-  id: string;
-  plan_id: string;
-  estado: string;
-  fecha_inicio: string;
-  fecha_vencimiento: string;
-  plan: Plan;
 }
 
 type MetodoPago = 'TARJETA_CREDITO' | 'PASARELA' | 'CONSIGNACION';

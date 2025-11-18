@@ -83,7 +83,7 @@ export default function LoginPage() {
 
         // ✅ El useEffect manejará la redirección automáticamente
       } else {
-        const errorMsg = response.message || 'Credenciales inválidas';
+        const errorMsg = 'Credenciales inválidas';
         setServerError(errorMsg);
         toast.error('Error de autenticación', {
           icon: <AlertCircle className="w-5 h-5" />,

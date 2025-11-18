@@ -1,5 +1,17 @@
 import { create } from 'zustand';
-import { Producto } from '@/lib/api/services';
+
+// Define una interfaz básica para Producto
+interface Producto {
+  id: string;
+  nombre: string;
+  precio: number;
+  // Agrega otras propiedades que necesites
+  descripcion?: string;
+  imagen_url?: string;
+  categoria?: string;
+  marca?: string;
+  requiere_receta?: boolean;
+}
 
 interface CartItem extends Producto {
   cantidad: number;

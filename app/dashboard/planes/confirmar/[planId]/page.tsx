@@ -137,7 +137,7 @@ export default function ConfirmarSuscripcionPage() {
 
       console.log('✅ [PASO 2] Respuesta completa:', response);
       
-      const responseData = response.data.data || response.data;
+      const responseData = response.data;
       
       console.log('📦 [PASO 2] Data extraída:', responseData);
 
