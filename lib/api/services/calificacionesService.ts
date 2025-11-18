@@ -27,6 +27,11 @@ export const calificacionesService = {
     return response.data;
   },
 
+  getCalificacionesMedico: async (medico_id: string) => {
+    const response = await apiClient.get(`/calificaciones/medicos/medico/${medico_id}`);
+    return response.data;
+  },
+
 };
 
 export default calificacionesService;
