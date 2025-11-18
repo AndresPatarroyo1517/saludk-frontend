@@ -109,7 +109,7 @@ npm run dev
 yarn dev
 ```
 
-The server will start with hot-reloading enabled, typically on `http://https://saludk-backend.vercel.app`
+The server will start with hot-reloading enabled, typically on `http://http:localhost:3000`
 
 ### Production Mode
 
@@ -147,7 +147,7 @@ saludk-backend/
 ### Base URL
 
 ```
-http://https://saludk-backend.vercel.app/api/v1
+http://http:localhost:3000/api/v1
 ```
 
 ### Endpoints
