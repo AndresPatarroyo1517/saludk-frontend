@@ -159,9 +159,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <div className="p-4 border-t space-y-2">
             <div className="flex items-center space-x-3 px-4 py-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
-              </div>
+              {/* Avatar clickable que redirige a /dashboard/info */}
+              <Link href="/dashboard/info">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+              </Link>
+
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-800 truncate">
                   {user?.datos_personales?.nombres} {user?.datos_personales?.apellidos}
@@ -169,6 +173,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
             </div>
+
             <Button
               onClick={handleLogout}
               variant="outline"
