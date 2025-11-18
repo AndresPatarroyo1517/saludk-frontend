@@ -91,6 +91,9 @@ export interface DatosPersonales {
   tipo_sangre: string | null;
   alergias: string[];
   direcciones: Direccion[];
+  // Campos opcionales que pueden venir desde la API
+  especialidad?: string | null;
+  calificacion_promedio?: string | number | null;
 }
 
 export interface User {
@@ -103,6 +106,8 @@ export interface User {
   datos_personales: DatosPersonales | null;
   historial_medico: HistorialMedico | null;
   proximas_citas: Cita[];
+  // Disponibilidades del usuario (usadas en la UI del médico)
+  disponibilidades?: { dia_semana: string; hora_inicio: string; hora_fin: string }[];
   plan_activo: PlanActivo | null;
   ordenes_pago: OrdenPago[];
 }
