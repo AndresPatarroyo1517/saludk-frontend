@@ -4,6 +4,20 @@ import { useAuthStore } from '@/lib/store/authStore';
 import { calificacionesService } from '@/lib/api/services/calificacionesService';
 import { useEffect, useState } from 'react';
 import { citasService } from '@/lib/api/services/citasService';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Star, 
+  Calendar, 
+  Clock, 
+  Users, 
+  MessageCircle,
+  MapPin,
+  Video,
+  Filter,
+  ChevronDown
+} from 'lucide-react';
 
 // Interfaces para las calificaciones basadas en la respuesta real
 interface Calificacion {
@@ -43,6 +57,7 @@ export default function MedicoHome() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [modalidadSelect, setModalidadSelect] = useState<'ALL' | 'VIRTUAL' | 'PRESENCIAL'>('ALL');
+  const [isVisible, setIsVisible] = useState(false);
 
   // Obtener el ID real del médico desde posibles ubicaciones (datos_personales.id, medico_id, user.id)
   const medicoId = user?.datos_personales?.id || (user as any)?.medico_id || user?.id;
@@ -64,6 +79,7 @@ export default function MedicoHome() {
       : 0;
 
   useEffect(() => {
+    setIsVisible(true);
     const fetchCalificaciones = async () => {
       // Verificar que el usuario sea médico y tenga ID de médico
       if (!user || user.rol !== 'medico' || !medicoId) {
@@ -102,7 +118,7 @@ export default function MedicoHome() {
     };
 
     fetchCalificaciones();
-  }, [user, medicoId]); // Agregar medicoId como dependencia
+  }, [user, medicoId]);
 
   // Función para formatear horarios de disponibilidad
   const formatDisponibilidades = () => {
@@ -206,8 +222,8 @@ export default function MedicoHome() {
   // Mostrar estados de carga y error
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-2xl w-full">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-6 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl border-0 p-8 max-w-2xl w-full">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
             <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
@@ -220,11 +236,11 @@ export default function MedicoHome() {
 
   if (error) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-2xl w-full">
-          <div className="text-red-600 text-center">
-            <p>Error: {error}</p>
-            <p className="text-sm mt-2">Medico ID: {medicoId}</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-6 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl border-0 p-8 max-w-2xl w-full text-center">
+          <div className="text-red-600">
+            <p className="text-xl font-semibold">Error: {error}</p>
+            <p className="text-sm mt-2 text-gray-600">Medico ID: {medicoId}</p>
           </div>
         </div>
       </div>
@@ -234,147 +250,315 @@ export default function MedicoHome() {
   const horariosDisponibles = formatDisponibilidades();
 
   return (
-    <div className="p-6 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-4xl w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-6">
+      <div className={`max-w-6xl mx-auto transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        
         {/* Header con información del médico */}
-        <div className="flex items-center gap-6 mb-8">
-          {/* Foto de perfil (placeholder) */}
-          <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="text-gray-500 text-lg font-semibold">
-              {user?.datos_personales?.nombres?.[0] || 'M'}
-            </span>
-          </div>
-          
-          {/* Información del médico */}
-          <div className="flex-1">
-            <h1 className="text-3xl font-semibold text-gray-900">
-              Dr. {user?.datos_personales?.nombre_completo || 'Médico'}
-            </h1>
-            <p className="text-lg text-gray-600 mt-1">
-              {user?.datos_personales?.especialidad || 'Especialidad'}
-            </p>
-            
-            {/* Calificación promedio */}
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex items-center">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    className={`text-2xl ${
-                      star <= Math.round(calificacionPromedio)
-                        ? 'text-yellow-400'
-                        : 'text-gray-300'
-                    }`}
-                  >
-                    ★
-                  </span>
-                ))}
+        <Card className="border-0 bg-gradient-to-br from-white to-slate-50 shadow-xl mb-8 overflow-hidden">
+          <CardContent className="p-8">
+            <div className="flex flex-col lg:flex-row items-center gap-8">
+              {/* Foto de perfil */}
+              <div className="w-32 h-32 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-3xl flex items-center justify-center shadow-2xl group hover:scale-105 transition-transform duration-300">
+                <span className="text-white text-4xl font-bold">
+                  {user?.datos_personales?.nombres?.[0] || 'M'}
+                </span>
               </div>
-              <span className="text-lg font-medium text-gray-700">
-                {calificacionPromedio.toFixed(1)} ({calificaciones.length} calificaciones)
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Horarios disponibles desde la API (desplegable) */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Horarios Disponibles</h2>
-
-          <div className="flex items-center gap-3 mb-3">
-            <label className="text-sm font-medium">Modalidad:</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => { setModalidadSelect('ALL'); cargarSlots('ALL'); }} className={`px-3 py-1 rounded ${modalidadSelect === 'ALL' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
-                Todos
-              </button>
-              <button type="button" onClick={() => { setModalidadSelect('VIRTUAL'); cargarSlots('VIRTUAL'); }} className={`px-3 py-1 rounded ${modalidadSelect === 'VIRTUAL' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
-                Virtual
-              </button>
-              <button type="button" onClick={() => { setModalidadSelect('PRESENCIAL'); cargarSlots('PRESENCIAL'); }} className={`px-3 py-1 rounded ${modalidadSelect === 'PRESENCIAL' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
-                Presencial
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <select
-              value={selectedSlot}
-              onChange={(e) => setSelectedSlot(e.target.value)}
-              onFocus={() => { if (proximosSlots.length === 0 && !slotsLoading) cargarSlots(modalidadSelect); }}
-              className="w-full border rounded p-2"
-            >
-              <option value="">-- Consultar horarios --</option>
-              {slotsLoading && <option value="">Cargando horarios...</option>}
-              {!slotsLoading && proximosSlots.length === 0 && <option value="">No hay horarios disponibles</option>}
-              {!slotsLoading && proximosSlots.map((slot, i) => (
-                <option key={i} value={JSON.stringify(slot)}>
-                  {formatSlotLabel(slot)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Lista de calificaciones */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Calificaciones Recientes ({calificaciones.length})
-          </h2>
-          
-          {calificaciones.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              Aún no tienes calificaciones
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {calificaciones.map((calificacion) => (
-                <div key={calificacion.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <span className="font-semibold text-gray-900">
-                        {getNombrePaciente(calificacion)}
-                      </span>
-                      <div className="flex items-center gap-1 mt-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span
-                            key={star}
-                            className={`text-sm ${
-                              star <= parseInt(calificacion.puntuacion, 10)
-                                ? 'text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
-                          >
-                            ★
-                          </span>
-                        ))}
-                        <span className="text-sm text-gray-600 ml-2">
-                          ({calificacion.puntuacion}/5)
+              
+              {/* Información del médico */}
+              <div className="flex-1 text-center lg:text-left">
+                <Badge className="mb-4 bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 transition-all duration-300 px-4 py-2 text-sm font-medium">
+                  👨‍⚕️ Médico Certificado
+                </Badge>
+                
+                <h1 className="text-4xl font-bold text-slate-900 mb-2">
+                  Dr. {user?.datos_personales?.nombre_completo || 'Médico'}
+                </h1>
+                <p className="text-xl text-slate-600 mb-4">
+                  {user?.datos_personales?.especialidad || 'Especialidad'}
+                </p>
+                
+                {/* Calificación promedio */}
+                <div className="flex items-center justify-center lg:justify-start gap-4 mb-4">
+                  <div className="flex items-center bg-white rounded-2xl px-4 py-2 shadow-lg">
+                    <div className="flex items-center mr-3">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
+                          className={`text-2xl ${
+                            star <= Math.round(calificacionPromedio)
+                              ? 'text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        >
+                          ★
                         </span>
-                      </div>
+                      ))}
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm text-gray-500 block">
-                        {formatFecha(calificacion.fecha_creacion)}
-                      </span>
-                      <span className="text-xs text-gray-400 capitalize">
-                        {calificacion.cita.modalidad?.toLowerCase() ?? ''}
-                      </span>
-                    </div>
+                    <span className="text-xl font-bold text-slate-900">
+                      {calificacionPromedio.toFixed(1)}
+                    </span>
                   </div>
                   
-                  {calificacion.comentario && (
-                    <p className="text-gray-700 mt-2 bg-gray-50 p-3 rounded-lg">
-                      "{calificacion.comentario}"
-                    </p>
-                  )}
-                  
-                  <div className="text-xs text-gray-400 mt-2">
-                    Cita: {formatFecha(calificacion.cita.fecha_hora)}
+                  <div className="bg-white rounded-2xl px-4 py-2 shadow-lg">
+                    <span className="text-slate-700 font-medium">
+                      {calificaciones.length} calificaciones
+                    </span>
                   </div>
                 </div>
-              ))}
+
+                {/* Stats rápidas */}
+                <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                  <div className="flex items-center gap-2 text-slate-600 bg-white rounded-xl px-3 py-2 shadow-sm">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm">{calificaciones.length} Pacientes</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600 bg-white rounded-xl px-3 py-2 shadow-sm">
+                    <Calendar className="w-4 h-4 text-green-600" />
+                    <span className="text-sm">{horariosDisponibles.length} Horarios</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Columna izquierda - Horarios disponibles */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Horarios disponibles desde la API */}
+            <Card className="border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500 group hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Calendar className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-slate-900">Horarios Disponibles</CardTitle>
+                    <CardDescription>Próximos slots para consultas</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Filter className="w-4 h-4 text-slate-500" />
+                  <label className="text-sm font-medium text-slate-700">Modalidad:</label>
+                </div>
+                
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    type="button" 
+                    onClick={() => { setModalidadSelect('ALL'); cargarSlots('ALL'); }} 
+                    variant={modalidadSelect === 'ALL' ? 'default' : 'outline'}
+                    className={`transition-all duration-300 ${modalidadSelect === 'ALL' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg' : ''}`}
+                    size="sm"
+                  >
+                    Todos
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={() => { setModalidadSelect('VIRTUAL'); cargarSlots('VIRTUAL'); }} 
+                    variant={modalidadSelect === 'VIRTUAL' ? 'default' : 'outline'}
+                    className={`transition-all duration-300 ${modalidadSelect === 'VIRTUAL' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg' : ''}`}
+                    size="sm"
+                  >
+                    <Video className="w-4 h-4 mr-1" />
+                    Virtual
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={() => { setModalidadSelect('PRESENCIAL'); cargarSlots('PRESENCIAL'); }} 
+                    variant={modalidadSelect === 'PRESENCIAL' ? 'default' : 'outline'}
+                    className={`transition-all duration-300 ${modalidadSelect === 'PRESENCIAL' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg' : ''}`}
+                    size="sm"
+                  >
+                    <MapPin className="w-4 h-4 mr-1" />
+                    Presencial
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <select
+                    value={selectedSlot}
+                    onChange={(e) => setSelectedSlot(e.target.value)}
+                    onFocus={() => { if (proximosSlots.length === 0 && !slotsLoading) cargarSlots(modalidadSelect); }}
+                    className="w-full border-2 border-slate-200 rounded-xl p-3 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 appearance-none cursor-pointer"
+                  >
+                    <option value="">-- Consultar horarios disponibles --</option>
+                    {slotsLoading && <option value="">🔄 Cargando horarios...</option>}
+                    {!slotsLoading && proximosSlots.length === 0 && <option value="">📭 No hay horarios disponibles</option>}
+                    {!slotsLoading && proximosSlots.map((slot, i) => (
+                      <option key={i} value={JSON.stringify(slot)}>
+                        {formatSlotLabel(slot)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+
+                {selectedSlot && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mt-4">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <Clock className="w-4 h-4" />
+                      <span className="font-semibold">Horario seleccionado</span>
+                    </div>
+                    <p className="text-green-700 text-sm mt-1">
+                      {formatSlotLabel(JSON.parse(selectedSlot))}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Horarios configurados */}
+            <Card className="border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500 group hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Clock className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-slate-900">Tu Disponibilidad</CardTitle>
+                    <CardDescription>Horarios establecidos</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <div className="space-y-3">
+                  {horariosDisponibles.map((horario, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-blue-300 transition-all duration-300">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-slate-700">{horario}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Columna derecha - Calificaciones */}
+          <div className="lg:col-span-2">
+            <Card className="border-0 bg-white shadow-xl">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center">
+                      <Star className="w-6 h-6 text-yellow-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl text-slate-900">Calificaciones</CardTitle>
+                      <CardDescription>
+                        {calificaciones.length} evaluaciones de pacientes
+                      </CardDescription>
+                    </div>
+                  </div>
+                  
+                  <Badge className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-4 py-2 text-lg font-semibold">
+                    {calificacionPromedio.toFixed(1)}/5
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                {calificaciones.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <MessageCircle className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-slate-700 mb-2">
+                      Aún no tienes calificaciones
+                    </h3>
+                    <p className="text-slate-500 max-w-md mx-auto">
+                      Las calificaciones de tus pacientes aparecerán aquí después de cada consulta.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {calificaciones.map((calificacion) => (
+                      <div 
+                        key={calificacion.id} 
+                        className="border-0 bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-500 group hover:scale-105 border border-slate-200"
+                      >
+                        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl flex items-center justify-center text-white font-semibold text-lg">
+                                {calificacion.paciente.nombres[0]}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-slate-900 text-lg block">
+                                  {getNombrePaciente(calificacion)}
+                                </span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <div className="flex items-center">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <span
+                                        key={star}
+                                        className={`text-lg ${
+                                          star <= parseInt(calificacion.puntuacion, 10)
+                                            ? 'text-yellow-400'
+                                            : 'text-gray-300'
+                                        }`}
+                                      >
+                                        ★
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <span className="text-slate-600 text-sm font-medium">
+                                    ({calificacion.puntuacion}/5)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {calificacion.comentario && (
+                              <div className="bg-blue-50 rounded-xl p-4 mt-3 border border-blue-100">
+                                <div className="flex items-start gap-2">
+                                  <MessageCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                                  <p className="text-slate-700 text-lg leading-relaxed italic">
+                                    "{calificacion.comentario}"
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="text-right flex-shrink-0">
+                            <div className="inline-flex flex-col items-end">
+                              <span className="text-sm text-slate-500 bg-slate-100 rounded-full px-3 py-1 font-medium">
+                                {formatFecha(calificacion.fecha_creacion)}
+                              </span>
+                              <Badge 
+                                variant="outline" 
+                                className={`mt-2 capitalize ${
+                                  calificacion.cita.modalidad?.toLowerCase() === 'virtual' 
+                                    ? 'border-blue-200 text-blue-700 bg-blue-50' 
+                                    : 'border-green-200 text-green-700 bg-green-50'
+                                }`}
+                              >
+                                {calificacion.cita.modalidad?.toLowerCase() === 'virtual' ? (
+                                  <Video className="w-3 h-3 mr-1" />
+                                ) : (
+                                  <MapPin className="w-3 h-3 mr-1" />
+                                )}
+                                {calificacion.cita.modalidad?.toLowerCase() ?? 'virtual'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-sm text-slate-500 pt-3 border-t border-slate-100">
+                          <Calendar className="w-4 h-4" />
+                          <span>Cita realizada: {formatFecha(calificacion.cita.fecha_hora)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

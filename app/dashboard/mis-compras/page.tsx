@@ -31,7 +31,7 @@ export default function MisComprasPage() {
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetch('http://http:localhost:3000/productos/mis-compras?limit=20&offset=0', { credentials: 'include', signal: ctrl.signal });
+        const resp = await fetch('http://https://saludk-backend.vercel.app//productos/mis-compras?limit=20&offset=0', { credentials: 'include', signal: ctrl.signal });
         if (!resp.ok) {
           const txt = await resp.text();
           throw new Error(txt || `HTTP ${resp.status}`);
@@ -60,7 +60,7 @@ export default function MisComprasPage() {
         // Try to also load existing product ratings and merge them into compras
         let ratings: any[] = [];
         try {
-          const r = await fetch('http://http:localhost:3000/calificaciones/mis-calificaciones?tipo=productos', { credentials: 'include' });
+          const r = await fetch('http://https://saludk-backend.vercel.app//calificaciones/mis-calificaciones?tipo=productos', { credentials: 'include' });
           if (r.ok) {
             const rd = await r.json();
             ratings = rd?.data?.productos ?? rd?.data?.calificaciones ?? rd?.data ?? [];
@@ -110,7 +110,7 @@ export default function MisComprasPage() {
 
   const loadExistingProductRating = async (productoId: string, compraId: string) => {
     try {
-      const resp = await fetch('http://http:localhost:3000/calificaciones/mis-calificaciones?tipo=productos', { credentials: 'include' });
+      const resp = await fetch('http://https://saludk-backend.vercel.app//calificaciones/mis-calificaciones?tipo=productos', { credentials: 'include' });
       if (!resp.ok) return null;
       const data = await resp.json();
       const list = data?.data?.productos ?? data?.data?.calificaciones ?? data?.data?.compras ?? data?.calificaciones ?? data?.data ?? [];
@@ -180,7 +180,7 @@ export default function MisComprasPage() {
       let usedId = ratingId;
       if (ratingId) {
         // Update existing rating
-        const resp = await fetch(`http://http:localhost:3000/calificaciones/productos/${ratingId}`, {
+        const resp = await fetch(`http://https://saludk-backend.vercel.app//calificaciones/productos/${ratingId}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -199,7 +199,7 @@ export default function MisComprasPage() {
           comentario: ratingComentario || ''
         };
 
-        const resp = await fetch('http://http:localhost:3000/calificaciones/productos', {
+        const resp = await fetch('http://https://saludk-backend.vercel.app//calificaciones/productos', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
