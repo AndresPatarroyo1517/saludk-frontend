@@ -81,6 +81,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: '/medico', icon: Home, label: 'Inicio' },
     { href: '/medico/perfil', icon: User, label: 'Mi Perfil' },
     { href: '/medico/citas', icon: CalendarClock, label: 'Citas Medicas' },
+    { href: '/medico/historial', icon: FileText, label: 'Historial' },
   ];
 
   let links: NavLink[] = [];
