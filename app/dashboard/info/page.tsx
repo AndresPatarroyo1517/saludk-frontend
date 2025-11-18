@@ -32,7 +32,6 @@ export default function InfoPage() {
   // ✅ Refrescar datos al montar el componente
   useEffect(() => {
     const refreshData = async () => {
-      console.log('🔄 [InfoPage] Refrescando datos del usuario...');
       try {
         await fetchUserData();
       } catch (error) {

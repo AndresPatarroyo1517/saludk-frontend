@@ -149,9 +149,7 @@ export default function CartPage() {
 
   const confirmarCompraEnBackend = async (compraId: string) => {
     try {
-      console.log('🟢 Confirmando compra:', compraId);
       const response = await pagoService.confirmarCompra(compraId);
-      console.log('✅ Compra confirmada:', response);
       return true;
     } catch (error: any) {
       console.error('❌ Error confirmando compra:', error);
@@ -168,7 +166,6 @@ export default function CartPage() {
       return;
     }
 
-    console.log('🟢 Creando compra con método:', metodoPago);
     setLoading(true);
 
     try {
@@ -183,8 +180,6 @@ export default function CartPage() {
         direccion_entrega_id: direccionSeleccionada,
         codigoPromocion: promocionAplicada?.codigo,
       });
-
-      console.log('✅ Compra creada:', response);
 
       const responseData = response.data || response;
       
@@ -211,7 +206,6 @@ export default function CartPage() {
       });
 
     } catch (error: any) {
-      console.error('❌ Error creando compra:', error);
       toast.error('Error al crear la compra', {
         description: error.response?.data?.error || error.message,
       });
@@ -221,10 +215,8 @@ export default function CartPage() {
   };
 
   const handlePagoExitoso = async () => {
-    console.log('🟢 Pago exitoso para orden:', ordenId);
     
     try {
-      // Confirmar la compra en el backend para tarjeta
       if (compraData?.id) {
         const confirmado = await confirmarCompraEnBackend(compraData.id);
         if (!confirmado) {

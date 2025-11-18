@@ -84,7 +84,6 @@ export default function ConfirmarSuscripcionPage() {
   const handleCrearSuscripcion = async () => {
     if (!plan) return;
 
-    console.log('🟢 [PASO 1] Creando suscripción para plan:', plan.id);
     setLoading(true);
 
     try {
@@ -92,8 +91,6 @@ export default function ConfirmarSuscripcionPage() {
         planId: plan.id,
         metodoPago
       });
-
-      console.log('✅ [PASO 1] Suscripción creada:', response);
 
       if (!response.data?.suscripcion?.id) {
         throw new Error('No se pudo crear la suscripción');
@@ -126,7 +123,6 @@ export default function ConfirmarSuscripcionPage() {
       return;
     }
 
-    console.log('🟢 [PASO 2] Procesando pago con método:', metodoPago);
     setLoading(true);
 
     try {
@@ -135,11 +131,9 @@ export default function ConfirmarSuscripcionPage() {
         metodoPago
       });
 
-      console.log('✅ [PASO 2] Respuesta completa:', response);
       
       const responseData = response.data;
       
-      console.log('📦 [PASO 2] Data extraída:', responseData);
 
       if (responseData.ordenPago?.id) {
         setOrdenId(responseData.ordenPago.id);
@@ -188,17 +182,13 @@ export default function ConfirmarSuscripcionPage() {
       return;
     }
 
-    console.log('🟢 [PASO 3] Simulando pago exitoso para orden:', ordenId);
     setLoading(true);
 
     try {
-      // Simular según método de pago
       if (metodoPago === 'TARJETA_CREDITO') {
         await pagoService.simularPagoExitoso(ordenId);
-        console.log('✅ Pago con tarjeta simulado');
       } else if (metodoPago === 'PASARELA') {
         await pagoService.simularPSE(ordenId);
-        console.log('✅ Pago PSE simulado');
       }
       // Para consignación NO simulamos nada (debe ser manual)
 

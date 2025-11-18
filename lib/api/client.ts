@@ -67,7 +67,6 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
       refreshPromise = apiClient.post('/login/refresh')
         .then(() => {
-          console.log('✅ Token refrescado exitosamente');
         })
         .catch((refreshError) => {
           console.error('❌ Error al refrescar token:', refreshError);

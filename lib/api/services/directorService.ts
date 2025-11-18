@@ -37,7 +37,6 @@ export const directorService = {
 
   getDocumentosSolicitud: async (id: string) => {
     const response = await apiClient.get(`/registro/solicitudes/${id}/documentos`);
-    //console.log('Datos:', JSON.stringify(response.data, null, 2));
     return response.data;
   },
 

@@ -68,9 +68,6 @@ export default function MisCitasPage() {
 
   // Debug: mostrar información del usuario
   useEffect(() => {
-    console.log('📋 User actual:', user);
-    console.log('📋 paciente_id:', user?.paciente_id || user?.datos_personales?.id || user?.id);
-    console.log('📋 user.id:', user?.id);
   }, [user]);
 
   // Modal/agendamiento state
@@ -106,13 +103,13 @@ export default function MisCitasPage() {
         // intentar por paciente
         try {
           const resp = await citasService.getCitasPaciente(String(paciente_id));
-          console.log('DEBUG getCitasPaciente response:', resp);
+         
           const list = resp?.data?.citas ?? resp?.citas ?? resp?.data ?? resp ?? [];
           if (Array.isArray(list) && list.length > 0) {
             // Debug: show summary of dates and months to detect missing items
             try {
               console.group('DEBUG citas summary (load)');
-              console.log('total citas received:', list.length);
+            
               const mapped = list.map((c: any) => {
                 const d = parseAsUTC(c.fecha_hora) ?? new Date(String(c.fecha_hora));
                 return {
@@ -125,7 +122,7 @@ export default function MisCitasPage() {
               });
               console.table(mapped);
               const months = Array.from(new Set(mapped.map((m: any) => m.month_utc).filter(Boolean)));
-              console.log('months present (UTC):', months);
+             
               console.groupEnd();
             } catch (e) {
               console.warn('Error al generar summary de citas:', e);
@@ -141,7 +138,7 @@ export default function MisCitasPage() {
         try {
           const usuarioId = String(user.id);
           const list2 = await citasService.getCitasPorUsuario(usuarioId);
-          console.log('DEBUG getCitasPorUsuario result:', list2);
+       
           if (Array.isArray(list2) && list2.length > 0) {
             setCitas(list2);
             return;
@@ -168,19 +165,19 @@ export default function MisCitasPage() {
     try {
       try {
         const resp = await citasService.getCitasPaciente(String(paciente_id));
-        console.log('DEBUG refresh getCitasPaciente response:', resp);
+      
         const list = resp?.data?.citas ?? resp?.citas ?? resp?.data ?? resp ?? [];
         if (Array.isArray(list) && list.length > 0) {
           try {
             console.group('DEBUG citas summary (refresh)');
-            console.log('total citas received (refresh):', list.length);
+        
             const mapped = list.map((c: any) => {
               const d = parseAsUTC(c.fecha_hora) ?? new Date(String(c.fecha_hora));
               return { id: c.id, fecha_hora: c.fecha_hora, iso: d ? d.toISOString() : null, month_local: d ? monthKey(d) : null, month_utc: d ? monthKeyUTC(d) : null };
             });
             console.table(mapped);
             const months = Array.from(new Set(mapped.map((m: any) => m.month_utc).filter(Boolean)));
-            console.log('months present (UTC):', months);
+        
             console.groupEnd();
           } catch (e) {
             console.warn('Error al generar summary de citas (refresh):', e);
@@ -194,7 +191,7 @@ export default function MisCitasPage() {
 
       const usuarioId = String(user.id);
       const list2 = await citasService.getCitasPorUsuario(usuarioId);
-      console.log('DEBUG refresh getCitasPorUsuario result:', list2);
+    
       setCitas(Array.isArray(list2) ? list2 : []);
     } catch (err) {
       console.error('Error cargando citas', err);
@@ -238,8 +235,7 @@ export default function MisCitasPage() {
     setCanceling(true);
     try {
       const resp = await citasService.cancelarCita(citaToCancel);
-      console.log('Respuesta cancelación (frontend):', resp);
-      // refrescar la lista desde el backend para mantener sincronía
+  
       try {
         await refreshCitas();
       } catch (e) {
@@ -257,18 +253,7 @@ export default function MisCitasPage() {
       }
     } catch (err: any) {
       // Logging mejorado para depuración — intentamos obtener campos útiles
-      try {
-        console.group('Error cancelando cita (detalles)');
-        console.error('raw error object:', err);
-        console.log('isAxiosError:', Boolean(err?.isAxiosError));
-        console.log('message:', err?.message);
-        console.log('response status:', err?.response?.status);
-        console.log('response data:', err?.response?.data);
-        console.log('request config:', err?.config?.url, err?.config?.method);
-        console.groupEnd();
-      } catch (e) {
-        console.error('Falló al loggear el error:', e, err);
-      }
+
 
       // Intentar extraer un mensaje de servidor de distintas formas
       const serverMsg = err?.response?.data?.error
@@ -283,7 +268,7 @@ export default function MisCitasPage() {
         if (!err?.response || (typeof status === 'number' && status >= 500)) {
           try {
             const retryResp = await citasService.cancelarCita(citaToCancel);
-            console.log('Reintento de cancelación exitoso:', retryResp);
+           
             try { await refreshCitas(); } catch (e) { console.warn('refreshCitas falló tras reintento:', e); }
             toast({ title: 'Cita cancelada', description: 'La cita fue cancelada correctamente.', className: 'bg-emerald-50 border-emerald-200 text-emerald-900' });
             setCitas((prev) => prev.filter((c) => String(c.id) !== String(citaToCancel)));
@@ -610,7 +595,7 @@ export default function MisCitasPage() {
     const loadMedicos = async () => {
       try {
         const resp = await medicosService.getMedicos();
-        console.log('Respuesta médicos (raw):', resp);
+      
         let list: any[] = [];
         
         // Intenta múltiples estructuras de respuesta
@@ -628,8 +613,7 @@ export default function MisCitasPage() {
           list = resp.medicos;
         }
         
-        console.log('Lista de médicos procesada:', list);
-        console.log('Cantidad de médicos:', list.length);
+     
         setMedicos(Array.isArray(list) ? list : []);
       } catch (err: any) {
         console.error('Error cargando médicos:', err);
@@ -663,7 +647,6 @@ export default function MisCitasPage() {
           duracion_cita: duracion
         });
 
-        console.log('Respuesta slots:', resp);
         let list: any[] = [];
         if (Array.isArray(resp?.data?.disponibilidad)) {
           list = resp.data.disponibilidad;
@@ -730,7 +713,6 @@ export default function MisCitasPage() {
         });
 
         setProximosSlots(disponibles);
-        console.log('Slots disponibles:', disponibles);
       } catch (err: any) {
         console.error('Error cargando slots:', err);
         setProximosSlots([]);
@@ -743,7 +725,6 @@ export default function MisCitasPage() {
   }, [selectedMedicoId, open, modalidad, duracion]);
 
   const confirmarReserva = async () => {
-    console.log('🔍 Debug confirmarReserva:', { selectedSlot, selectedMedicoId, paciente_id: user?.paciente_id || user?.datos_personales?.id || user?.id, user_id: user?.id });
     
     if (!selectedSlot || !selectedMedicoId || !user?.id) {
       console.error('❌ Falta info:', { selectedSlot: !!selectedSlot, selectedMedicoId: !!selectedMedicoId, user_id: !!user?.id });
@@ -765,11 +746,11 @@ export default function MisCitasPage() {
           const offH = pad(Math.floor(absMin / 60));
           const offM = pad(absMin % 60);
           fechaToSend = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${offH}:${offM}`;
-          console.log('ConfirmarReserva: fecha original:', selectedSlot?.fecha_hora_inicio, '-> fecha a enviar (local offset):', fechaToSend);
+         
         } else {
           // Enviar como ISO UTC
           fechaToSend = parseAsUTC(selectedSlot.fecha_hora_inicio)?.toISOString() ?? selectedSlot.fecha_hora_inicio;
-          console.log('ConfirmarReserva: fecha original:', selectedSlot?.fecha_hora_inicio, '-> fecha a enviar (UTC):', fechaToSend);
+         
         }
       }
 
@@ -808,11 +789,9 @@ export default function MisCitasPage() {
         duracion_minutos: duracion
       };
 
-      console.log('📤 Enviando payload:', payload);
       let resp: any = null;
       if (isEditing && editingCitaId) {
         resp = await citasService.reprogramarCita(editingCitaId, payload);
-        console.log('✅ Cita reprogramada:', resp);
         toast({
           title: "¡Cita reprogramada!",
           description: "La cita ha sido reprogramada correctamente.",
@@ -820,7 +799,6 @@ export default function MisCitasPage() {
         });
       } else {
         resp = await citasService.crearCita(payload);
-        console.log('✅ Cita creada:', resp);
         toast({
           title: "¡Cita creada exitosamente!",
           description: "Tu cita médica ha sido agendada correctamente.",
@@ -854,7 +832,6 @@ export default function MisCitasPage() {
           if (!paciente) {
             try {
               paciente = await pacienteService.createForUsuario(String(user.id));
-              console.log('Paciente creado desde frontend:', paciente);
             } catch (e2) {
               console.error('No se pudo crear paciente desde frontend:', e2);
             }
@@ -870,9 +847,7 @@ export default function MisCitasPage() {
               motivo_consulta: motivo,
               duracion_minutos: duracion
             };
-            console.log('📤 Reintentando con paciente.id:', retryPayload);
             const resp2 = await citasService.crearCita(retryPayload);
-            console.log('✅ Cita creada al reintentar:', resp2);
             toast({
               title: "¡Cita creada exitosamente!",
               description: "Tu cita médica ha sido agendada correctamente.",

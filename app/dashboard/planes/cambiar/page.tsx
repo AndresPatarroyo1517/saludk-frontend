@@ -128,7 +128,6 @@ function CambiarPlanContent() {
   const handleCambiarPlan = async () => {
     if (!nuevoPlan) return;
 
-    console.log('🟢 [PASO 2] Cambiando plan a:', nuevoPlan.id);
     setLoading(true);
 
     try {
@@ -136,8 +135,6 @@ function CambiarPlanContent() {
         nuevoPlanId: nuevoPlan.id,
         metodoPago
       });
-
-      console.log('✅ [PASO 2] Plan cambiado:', response);
 
       if (!response.data?.nuevaSuscripcion?.id) {
         throw new Error('No se pudo cambiar el plan');
@@ -170,7 +167,6 @@ function CambiarPlanContent() {
       return;
     }
 
-    console.log('🟢 [PASO 3] Procesando pago con método:', metodoPago);
     setLoading(true);
 
     try {
@@ -179,12 +175,8 @@ function CambiarPlanContent() {
         metodoPago
       });
 
-      console.log('✅ [PASO 3] Respuesta completa:', response);
-      
       const responseData = response.data;
       
-      console.log('📦 [PASO 3] Data extraída:', responseData);
-
       if (responseData.ordenPago?.id) {
         setOrdenId(responseData.ordenPago.id);
       }
@@ -231,16 +223,13 @@ function CambiarPlanContent() {
       return;
     }
 
-    console.log('🟢 [PASO 4] Simulando pago exitoso para orden:', ordenId);
     setLoading(true);
 
     try {
       if (metodoPago === 'TARJETA_CREDITO') {
         await pagoService.simularPagoExitoso(ordenId);
-        console.log('✅ Pago con tarjeta simulado');
       } else if (metodoPago === 'PASARELA') {
         await pagoService.simularPSE(ordenId);
-        console.log('✅ Pago PSE simulado');
       }
 
       setPaso(5);

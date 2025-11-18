@@ -44,7 +44,6 @@ function PlanesContent() {
   // ✅ REDIRECCIÓN AUTOMÁTICA si tiene plan activo Y NO está cambiando
   useEffect(() => {
     if (!modoCambio && user?.plan_activo?.estado === 'ACTIVA') {
-      console.log('🔄 Usuario tiene plan activo, redirigiendo a mis-suscripciones...');
       router.push('/dashboard/mis-suscripciones');
     }
   }, [user, router, modoCambio]);

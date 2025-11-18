@@ -45,7 +45,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const refreshData = async () => {
       if (user) {
-        console.log('🔄 [Dashboard] Refrescando datos del usuario...');
+       
         try {
           await fetchUserData();
         } catch (error) {
@@ -60,7 +60,7 @@ export default function DashboardPage() {
   useEffect(() => {
     // ✅ Calcular estadísticas cuando el usuario cambie
     if (user) {
-      console.log('📊 [Dashboard] Calculando estadísticas para:', user.email);
+   
       
       const proximasCitas = user.proximas_citas?.length || 0;
 

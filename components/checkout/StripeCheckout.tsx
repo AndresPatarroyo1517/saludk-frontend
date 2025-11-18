@@ -88,16 +88,12 @@ function CheckoutForm({
         } else if (paymentIntent) {
         
         if (paymentIntent.status === 'succeeded') {
-          console.log('✅ Pago exitoso');
           onSuccess();
         } else if (paymentIntent.status === 'processing') {
-          console.log('⏳ Pago en proceso...');
           setErrorMessage('Tu pago está siendo procesado. Te notificaremos cuando esté completo.');
         } else if (paymentIntent.status === 'requires_payment_method') {
-          console.log('⚠️ Requiere método de pago');
           setErrorMessage('El pago fue rechazado. Por favor intenta con otro método de pago.');
         } else {
-          console.log('⚠️ Estado desconocido:', paymentIntent.status);
           setErrorMessage(`Estado del pago: ${paymentIntent.status}`);
         }
       }

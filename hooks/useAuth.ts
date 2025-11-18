@@ -24,13 +24,10 @@ export function useAuth() {
 
     const checkAuth = async () => {
       isChecking.current = true;
-      console.log('🔄 [useAuth] Iniciando verificación de sesión...');
-      
       try {
         await fetchUserData();
       } catch (error) {
         console.error('❌ [useAuth] Error al verificar autenticación:', error);
-        // ✅ Si falla, marcar como inicializado de todas formas
         useAuthStore.getState().setInitialized(true);
       } finally {
         isChecking.current = false;
@@ -46,18 +43,13 @@ export function useAuth() {
     rememberMe = false
   ) => {
     try {
-      console.log('🔑 [useAuth] Intentando login...');
       const response = await authService.login({ email, password, rememberMe });
       
       if (response.success && response.usuario) {
-        console.log('✅ [useAuth] Login exitoso:', response.usuario.email);
         setAuth(response.usuario);
         
-        // ✅ NUEVO: Obtener datos completos del usuario después del login
-        console.log('🔄 [useAuth] Obteniendo datos completos del usuario...');
         try {
           await fetchUserData();
-          console.log('✅ [useAuth] Datos completos obtenidos');
         } catch (err) {
           console.warn('⚠️ [useAuth] Error al obtener datos completos, usando datos del login');
         }
@@ -72,7 +64,6 @@ export function useAuth() {
       return response;
     } catch (error: any) {
       console.error('❌ [useAuth] Error en login:', error);
-      // ✅ Asegurar que se marque como inicializado incluso si falla
       useAuthStore.getState().setInitialized(true);
       throw error;
     }
@@ -80,9 +71,7 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
-      console.log('🚪 [useAuth] Cerrando sesión...');
       await authService.logout();
-      console.log('✅ [useAuth] Logout exitoso');
     } catch (error) {
       console.error('❌ [useAuth] Error en logout:', error);
     } finally {

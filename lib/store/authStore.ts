@@ -140,28 +140,26 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
-      isInitialized: false, // ✅ Siempre false al inicio
+      isInitialized: false,
       isLoading: false,
       error: null,
 
       setAuth: (user) => {
-        console.log('✅ [authStore] Usuario autenticado:', user.email);
         set({
           user,
           isAuthenticated: true,
           isInitialized: true,
-          isLoading: false, // ✅ Asegurar que no quede cargando
+          isLoading: false,
           error: null
         });
       },
 
       clearAuth: () => {
-        console.log('🔴 [authStore] Sesión limpiada');
         set({
           user: null,
           isAuthenticated: false,
           isInitialized: true,
-          isLoading: false, // ✅ Asegurar que no quede cargando
+          isLoading: false,
           error: null
         });
       },
@@ -198,20 +196,15 @@ export const useAuthStore = create<AuthState>()(
 
         // ✅ Si no hay usuario persistido, no hacer petición
         if (!state.user && !state.isAuthenticated) {
-          console.log('⏭️ [authStore] No hay sesión persistida, omitiendo verificación');
           set({ isInitialized: true, isLoading: false });
           return;
         }
 
         try {
           set({ isLoading: true, error: null });
-          console.log('🔄 [authStore] Verificando sesión persistida...');
-
-          // ✅ Usar apiClient que maneja cookies y refresh automáticamente
           const response = await apiClient.get('/login/me');
 
           if (response.data.success && response.data.usuario) {
-            console.log('✅ [authStore] Sesión válida:', response.data.usuario.email);
             set({
               user: response.data.usuario,
               isAuthenticated: true,
@@ -228,7 +221,6 @@ export const useAuthStore = create<AuthState>()(
           
           // ✅ Solo limpiar si es error 401 (no autenticado)
           if (error.response?.status === 401) {
-            console.log('🔓 [authStore] Usuario no autenticado (401)');
             get().clearAuth();
           } else {
             // ✅ Otros errores no limpian el estado

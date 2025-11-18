@@ -95,7 +95,6 @@ export const authService = {
         headers: { 'Content-Type': 'multipart/form-data' },
       }
     );
-    //console.log('Datos:', JSON.stringify(response.data, null, 2));
     return response.data;
   },
 
@@ -116,7 +115,6 @@ export const authService = {
 
   validacionAutomatica: async (solicitudId: number | string) => {
     const response = await apiClient.post(`/validacion/solicitudes/${solicitudId}/revisar`);
-    console.log('Datos:', JSON.stringify(response.data, null, 2));
     return response.data;
   },
 };

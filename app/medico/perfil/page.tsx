@@ -92,12 +92,7 @@ export default function MedicoHome() {
         setLoading(true);
         setError(null);
         
-        console.log('🔍 Obteniendo calificaciones para médico ID:', medicoId);
-        
-        // Usar el ID real del médico (datos_personales.id)
         const response = await calificacionesService.getCalificacionesMedico(medicoId);
-        
-        console.log('📊 Respuesta de calificaciones:', response);
         
         // Acceder a las calificaciones según la estructura real
         if (response && response.calificaciones && Array.isArray(response.calificaciones)) {
@@ -151,9 +146,7 @@ export default function MedicoHome() {
       if (modalidadFilter && modalidadFilter !== 'ALL') params.modalidad = modalidadFilter;
 
       const resp = await citasService.getDisponibilidad(String(medicoId), params as any);
-      console.log('DEBUG cargarSlots respuesta raw:', resp);
 
-      // Normalizar respuesta: seguir las formas que usa el dashboard
       let slots: any[] = [];
       if (!resp) slots = [];
       else if (Array.isArray(resp)) slots = resp;

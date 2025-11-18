@@ -21,13 +21,6 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       return;
     }
 
-    console.log('🔒 [ProtectedRoute] Verificando acceso:', {
-      isAuthenticated,
-      user: user?.email,
-      rol: user?.rol,
-      allowedRoles
-    });
-
     if (!isAuthenticated || !user) {
       redirected.current = true;
       console.log('❌ [ProtectedRoute] No autenticado, redirigiendo a /login');
@@ -41,13 +34,11 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       if (!allowedRoles.includes(normalizedRole)) {
         redirected.current = true;
         const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
-        console.log(`❌ [ProtectedRoute] Rol ${user.rol} no permitido, redirigiendo a ${targetRoute}`);
         router.replace(targetRoute);
         return;
       }
     }
 
-    console.log('✅ [ProtectedRoute] Acceso permitido:', user.email, '| Rol:', user.rol);
   }, [isInitialized, isAuthenticated, user, allowedRoles, router]);
 
   if (!isInitialized || isLoading) {

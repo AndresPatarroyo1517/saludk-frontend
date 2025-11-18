@@ -48,7 +48,6 @@ export default function LoginPage() {
 
   // ✅ CRÍTICO: Marcar como inicializado inmediatamente al montar
   useEffect(() => {
-    console.log('🔐 [LoginPage] Página de login montada, forzando inicialización');
     setInitialized(true);
   }, [setInitialized]);
 
@@ -60,7 +59,6 @@ export default function LoginPage() {
       redirected.current = true;
       const normalizedRole = user.rol.toLowerCase() as UserRole;
       const targetRoute = ROLE_REDIRECTS[normalizedRole] || '/dashboard';
-      console.log(`✅ [LoginPage] Usuario autenticado, redirigiendo a ${targetRoute}`);
       router.replace(targetRoute);
     }
   }, [isInitialized, isAuthenticated, user, router]);
@@ -70,11 +68,9 @@ export default function LoginPage() {
     setServerError(null);
 
     try {
-      console.log('🔑 [LoginPage] Intentando login para:', data.email);
       const response = await login(data.email, data.password, data.rememberMe || false);
       
       if (response.success && response.usuario) {
-        console.log('✅ [LoginPage] Login exitoso');
         
         toast.success('¡Bienvenido de nuevo!', {
           icon: <CheckCircle2 className="w-5 h-5" />,
