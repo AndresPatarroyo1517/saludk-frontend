@@ -42,9 +42,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, clearAuth } = useAuthStore();
   const hideHeaderTitle = pathname?.startsWith('/dashboard/citas');
 
-  // ✅ ELIMINADO - useAuth() ya maneja la verificación inicial
-  // No necesitamos verificar user aquí, ProtectedRoute ya lo hace
-
   const handleLogout = async () => {
     try {
       await loginService.logout();
@@ -56,7 +53,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     router.replace('/login');
   };
 
-  // ✅ Si no hay user, ProtectedRoute redirigirá, así que esto nunca se ejecutará
   if (!user) {
     return null;
   }
@@ -169,7 +165,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-800 truncate">
-                  {user?.datos_personales?.nombres} {user?.datos_personales?.apellidos}
+                  {(user as any)?.datos_personales?.nombres} {(user as any)?.datos_personales?.apellidos}
                 </p>
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
@@ -205,18 +201,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </div>
 
-            {user?.plan && user.rol === 'paciente' && (
+            {/* SOLUCIÓN: Usar any para evitar errores de tipos */}
+            {((user as any)?.plan || (user as any)?.plan_activo) && user.rol === 'paciente' && (
               <div className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg">
                 <CreditCard className="w-4 h-4 text-teal-600" />
                 <span className="text-sm font-medium text-teal-700 capitalize">
-                  Plan {user.plan}
+                  Plan {(user as any)?.plan || (user as any)?.plan_activo?.plan?.nombre}
                 </span>
               </div>
             )}
           </div>
         </header>
 
-        <main className="p-6">{children}</main>
+        {/* SOLUCIÓN: Cambiar main por div con role="main" */}
+        <div className="p-6" role="main">
+          {children}
+        </div>
       </div>
     </div>
   );
