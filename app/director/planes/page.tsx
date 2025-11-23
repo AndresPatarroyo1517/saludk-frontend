@@ -30,7 +30,26 @@ export default function DirectorPlanesPage() {
   const [consultasVirtuales, setConsultasVirtuales] = useState("");
   const [consultasPresenciales, setConsultasPresenciales] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [activo, setActivo] = useState<boolean>(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  // Normalize activo values coming from the backend which may be boolean, number, or string
+  const normalizeActivo = (v: any) => {
+    if (v === true) return true;
+    if (v === false) return false;
+    if (typeof v === 'number') return v === 1;
+    if (typeof v === 'string') {
+      const s = v.trim().toLowerCase();
+      // Accept many possible truthy/falsey representations
+      const truthy = ['1', 'true', 't', 'si', 'sí', 'yes', 'y', 'on', 'activo', 'active'];
+      const falsy = ['0', 'false', 'f', 'no', 'n', 'off', 'inactivo', 'inactive'];
+      if (truthy.includes(s)) return true;
+      if (falsy.includes(s)) return false;
+      // fallback to Boolean for anything else
+      return Boolean(s);
+    }
+    return Boolean(v);
+  };
   useEffect(() => {
     let mounted = true;
     const ctrl = new AbortController();
@@ -38,11 +57,27 @@ export default function DirectorPlanesPage() {
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetch('http://localhost:3000/planes', { credentials: 'include', signal: ctrl.signal });
+        const resp = await fetch('http://localhost:3000/planes/admin', { credentials: 'include', signal: ctrl.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        const list = data?.data ?? data ?? [];
-        if (mounted) setPlanes(Array.isArray(list) ? list : []);
+        const listCandidate = data?.data ?? data ?? [];
+
+        // Resolve an array in multiple possible shapes: direct array, { planes: [...] }, { data: [...] }, or pick first array value
+        let arr: any[] = [];
+        if (Array.isArray(listCandidate)) {
+          arr = listCandidate;
+        } else if (listCandidate && typeof listCandidate === 'object') {
+          if (Array.isArray((listCandidate as any).planes)) arr = (listCandidate as any).planes;
+          else if (Array.isArray((listCandidate as any).data)) arr = (listCandidate as any).data;
+          else {
+            // find first property whose value is an array
+            const val = Object.values(listCandidate).find(v => Array.isArray(v));
+            if (Array.isArray(val)) arr = val as any[];
+          }
+        }
+
+        const normalized = arr.map((p: any) => ({ ...p, activo: normalizeActivo(p?.activo) }));
+        if (mounted) setPlanes(normalized);
       } catch (e: any) {
         if (e.name === 'AbortError') return;
         console.error('Error cargando planes:', e);
@@ -58,7 +93,7 @@ export default function DirectorPlanesPage() {
 
   function openCreate() {
     setEditingPlan(null);
-    setNombre(''); setCodigo(''); setDescripcion(''); setPrecioMensual(''); setDuracionMeses(''); setBeneficiosText(''); setConsultasVirtuales(''); setConsultasPresenciales('');
+    setNombre(''); setCodigo(''); setDescripcion(''); setPrecioMensual(''); setDuracionMeses(''); setBeneficiosText(''); setConsultasVirtuales(''); setConsultasPresenciales(''); setActivo(true);
     setModalOpen(true);
   }
 
@@ -72,6 +107,7 @@ export default function DirectorPlanesPage() {
     setBeneficiosText((plan.beneficios ?? []).join('\n'));
     setConsultasVirtuales(String(plan.consultas_virtuales_incluidas ?? ''));
     setConsultasPresenciales(String(plan.consultas_presenciales_incluidas ?? ''));
+    setActivo(normalizeActivo(plan.activo ?? true));
     setModalOpen(true);
   }
 
@@ -99,6 +135,7 @@ export default function DirectorPlanesPage() {
         beneficios,
         consultas_virtuales_incluidas: consultasVirtuales,
         consultas_presenciales_incluidas: consultasPresenciales,
+        activo,
       } as any;
 
       if (editingPlan) {
@@ -117,8 +154,8 @@ export default function DirectorPlanesPage() {
 
         const updated = await resp.json().catch(() => null);
         const planResp = updated?.data ?? updated ?? null;
-        // update local list
-        setPlanes(prev => prev.map(p => p.id === editingPlan.id ? (planResp ?? { ...p, ...payload }) : p));
+        // update local list (normalize activo from response or fallback to payload)
+        setPlanes(prev => prev.map(p => p.id === editingPlan.id ? (planResp ? { ...planResp, activo: normalizeActivo(planResp.activo) } : { ...p, ...payload, activo: normalizeActivo(payload.activo) }) : p));
         toast({ title: 'Actualizado', description: 'Plan actualizado correctamente.', className: 'bg-emerald-50 border-emerald-200 text-emerald-900' });
       } else {
         // POST /planes
@@ -136,7 +173,7 @@ export default function DirectorPlanesPage() {
 
         const created = await resp.json().catch(() => null);
         const planResp = created?.data ?? created ?? null;
-        const newPlan = planResp ?? { id: crypto?.randomUUID?.() ?? String(Date.now()), ...payload };
+        const newPlan = planResp ? { ...planResp,activo: normalizeActivo(planResp.activo) } : { id: crypto?.randomUUID?.() ?? String(Date.now()), ...payload, activo: normalizeActivo(payload.activo) };
         setPlanes(prev => [newPlan, ...prev]);
         toast({ title: 'Creado', description: 'Plan creado correctamente.', className: 'bg-emerald-50 border-emerald-200 text-emerald-900' });
       }
@@ -147,6 +184,44 @@ export default function DirectorPlanesPage() {
       toast({ title: 'Error', description: e?.message || 'No se pudo guardar el plan', variant: 'destructive' });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function toggleActivo(plan: any) {
+    const target = !normalizeActivo(plan.activo);
+    setTogglingId(plan.id);
+    try {
+      // Build payload using existing fields and new activo flag
+      const payload = {
+        nombre: plan.nombre,
+        descripcion: plan.descripcion ?? '',
+        precio_mensual: plan.precio_mensual ?? '0',
+        duracion_meses: plan.duracion_meses ?? '0',
+        beneficios: plan.beneficios ?? [],
+        activo: target,
+      } as any;
+
+      const resp = await fetch(`http://localhost:3000/planes/${plan.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(txt || `HTTP ${resp.status}`);
+      }
+
+      const updated = await resp.json().catch(() => null);
+      const planResp = updated?.data ?? updated ?? null;
+      setPlanes(prev => prev.map(p => p.id === plan.id ? (planResp ? { ...planResp, activo: normalizeActivo(planResp.activo) } : { ...p, activo: target }) : p));
+      toast({ title: target ? 'Activado' : 'Desactivado', description: `Plan ${target ? 'activado' : 'desactivado'} correctamente.`, className: 'bg-emerald-50 border-emerald-200 text-emerald-900' });
+    } catch (e: any) {
+      console.error('Error toggling activo:', e);
+      toast({ title: 'Error', description: e?.message || 'No se pudo cambiar el estado', variant: 'destructive' });
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -171,33 +246,89 @@ export default function DirectorPlanesPage() {
               <div className="text-center text-slate-600 py-8">No hay planes disponibles.</div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {planes.map((plan) => (
-                <Card key={plan.id}>
-                  <CardHeader>
-                    <CardTitle className="text-xl">{plan.nombre}</CardTitle>
-                    <CardDescription className="text-sm">{plan.codigo}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-slate-700 mb-2">{plan.descripcion}</div>
-                    <div className="text-sm text-slate-600">Precio mensual: ${Number(plan.precio_mensual ?? 0).toLocaleString('es-CO')}</div>
-                    <div className="text-sm text-slate-600">Duración: {plan.duracion_meses} meses</div>
-                    <div className="text-sm text-slate-600 mt-2">Consultas virtuales: {plan.consultas_virtuales_incluidas}</div>
-                    <div className="text-sm text-slate-600">Consultas presenciales: {plan.consultas_presenciales_incluidas}</div>
-                    <div className="mt-3">
-                      <div className="text-sm font-semibold">Beneficios</div>
-                      <ul className="list-disc list-inside text-sm text-slate-700 mt-1">
-                        {(plan.beneficios ?? []).map((b: string, i: number) => <li key={i}>{b}</li>)}
-                      </ul>
-                    </div>
+            
 
-                    <div className="mt-4 flex items-center gap-2">
-                      <Button onClick={() => openEdit(plan)}>Editar</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {(() => {
+              const activos = planes.filter((p: any) => normalizeActivo(p.activo));
+              const inactivos = planes.filter((p: any) => !normalizeActivo(p.activo));
+              return (
+                <div className="space-y-6">
+                  {activos.length > 0 && (
+                    <section>
+                      <h2 className="text-lg font-semibold mb-3">Planes Activos</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {activos.map((plan) => (
+                          <Card key={plan.id}>
+                            <CardHeader>
+                              <CardTitle className="text-xl">{plan.nombre}</CardTitle>
+                              <div className="flex items-center justify-between">
+                                <CardDescription className="text-sm">{plan.codigo}</CardDescription>
+                                <div className={`text-xs font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-800`}>ACTIVO</div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-sm text-slate-700 mb-2">{plan.descripcion}</div>
+                              <div className="text-sm text-slate-600">Precio mensual: ${Number(plan.precio_mensual ?? 0).toLocaleString('es-CO')}</div>
+                              <div className="text-sm text-slate-600">Duración: {plan.duracion_meses} meses</div>
+                              <div className="text-sm text-slate-600 mt-2">Consultas virtuales: {plan.consultas_virtuales_incluidas}</div>
+                              <div className="text-sm text-slate-600">Consultas presenciales: {plan.consultas_presenciales_incluidas}</div>
+                              <div className="mt-3">
+                                <div className="text-sm font-semibold">Beneficios</div>
+                                <ul className="list-disc list-inside text-sm text-slate-700 mt-1">
+                                  {(plan.beneficios ?? []).map((b: string, i: number) => <li key={i}>{b}</li>)}
+                                </ul>
+                              </div>
+
+                              <div className="mt-4 flex items-center gap-2">
+                                <Button onClick={() => openEdit(plan)}>Editar</Button>
+                                <Button onClick={() => toggleActivo(plan)} className="bg-gray-50" disabled={togglingId === plan.id}>{togglingId === plan.id ? (plan.activo ? 'Desactivando...' : 'Activando...') : (plan.activo ? 'Desactivar' : 'Activar')}</Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {inactivos.length > 0 && (
+                    <section>
+                      <h2 className="text-lg font-semibold mb-3">Planes Inactivos</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {inactivos.map((plan) => (
+                          <Card key={plan.id}>
+                            <CardHeader>
+                              <CardTitle className="text-xl">{plan.nombre}</CardTitle>
+                              <div className="flex items-center justify-between">
+                                <CardDescription className="text-sm">{plan.codigo}</CardDescription>
+                                <div className={`text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700`}>INACTIVO</div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-sm text-slate-700 mb-2">{plan.descripcion}</div>
+                              <div className="text-sm text-slate-600">Precio mensual: ${Number(plan.precio_mensual ?? 0).toLocaleString('es-CO')}</div>
+                              <div className="text-sm text-slate-600">Duración: {plan.duracion_meses} meses</div>
+                              <div className="text-sm text-slate-600 mt-2">Consultas virtuales: {plan.consultas_virtuales_incluidas}</div>
+                              <div className="text-sm text-slate-600">Consultas presenciales: {plan.consultas_presenciales_incluidas}</div>
+                              <div className="mt-3">
+                                <div className="text-sm font-semibold">Beneficios</div>
+                                <ul className="list-disc list-inside text-sm text-slate-700 mt-1">
+                                  {(plan.beneficios ?? []).map((b: string, i: number) => <li key={i}>{b}</li>)}
+                                </ul>
+                              </div>
+
+                              <div className="mt-4 flex items-center gap-2">
+                                <Button onClick={() => openEdit(plan)}>Editar</Button>
+                                <Button onClick={() => toggleActivo(plan)} className="bg-gray-50" disabled={togglingId === plan.id}>{togglingId === plan.id ? (plan.activo ? 'Desactivando...' : 'Activando...') : (plan.activo ? 'Desactivar' : 'Activar')}</Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Modal crear/editar */}
@@ -212,6 +343,11 @@ export default function DirectorPlanesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Input value={nombre} onChange={(e:any) => setNombre(e.target.value)} placeholder="Nombre" />
                   <Input value={codigo} onChange={(e:any) => setCodigo(e.target.value)} placeholder="Código" />
+                </div>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <input id="activo" type="checkbox" checked={activo} onChange={(e:any) => setActivo(Boolean(e.target.checked))} />
+                  <label htmlFor="activo" className="text-sm text-slate-700">Activo</label>
                 </div>
 
                 <Textarea value={descripcion} onChange={(e:any) => setDescripcion(e.target.value)} placeholder="Descripción" />
@@ -233,7 +369,7 @@ export default function DirectorPlanesPage() {
               </div>
 
               <DialogFooter>
-                <Button onClick={submitForm}>{editingPlan ? 'Guardar cambios' : 'Crear plan'}</Button>
+                <Button onClick={submitForm} disabled={submitting}>{submitting ? (editingPlan ? 'Guardando...' : 'Creando...') : (editingPlan ? 'Guardar cambios' : 'Crear plan')}</Button>
                 <DialogClose asChild>
                   <Button className="bg-blue-600 text-white hover:bg-blue-700">Cancelar</Button>
                 </DialogClose>
