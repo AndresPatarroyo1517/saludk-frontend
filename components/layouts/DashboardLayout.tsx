@@ -71,6 +71,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: '/director', icon: Home, label: 'Inicio' },
     { href: '/director/solicitudes', icon: ClipboardList, label: 'Solicitudes' },
     { href: '/director/panel', icon: BarChart3, label: 'Reportes' },
+    { href: '/director/medicos', icon: Stethoscope, label: 'Medicos' },
   ];
 
   const medicoLinks: NavLink[] = [
