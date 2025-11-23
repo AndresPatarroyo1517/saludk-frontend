@@ -71,6 +71,13 @@ export const medicosService = {
     const response = await apiClient.post('/medicos/mi-disponibilidad', payload);
     return response.data;
   }
+,
+
+  // Eliminar una disponibilidad del médico autenticado
+  deleteMiDisponibilidad: async (disponibilidadId: string) => {
+    const response = await apiClient.delete(`/medicos/mi-disponibilidad/${disponibilidadId}`);
+    return response.data;
+  }
 };
 
 export default medicosService;

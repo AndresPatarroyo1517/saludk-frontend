@@ -17,6 +17,7 @@ import {
   Video,
   Filter,
   ChevronDown
+  , Trash
 } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -59,18 +60,23 @@ export default function MedicoHome() {
   // Estados para mostrar lista desplegable de horarios (slots)
   const [proximosSlots, setProximosSlots] = useState<any[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 4;
   const [modalidadSelect, setModalidadSelect] = useState<'ALL' | 'VIRTUAL' | 'PRESENCIAL'>('ALL');
   const [isVisible, setIsVisible] = useState(false);
 
   // Estados para el modal de disponibilidad (declarados al inicio para respetar el orden de Hooks)
   const [openDisponibilidad, setOpenDisponibilidad] = useState(false);
+  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   const [diaSemana, setDiaSemana] = useState<number>(0);
   const [horaInicio, setHoraInicio] = useState<string>('08:00');
   const [horaFin, setHoraFin] = useState<string>('09:00');
   const [modalidad, setModalidad] = useState<'PRESENCIAL' | 'VIRTUAL'>('PRESENCIAL');
   const [nuevasDisponibilidades, setNuevasDisponibilidades] = useState<Array<any>>([]);
   const [saving, setSaving] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const fetchUserData = useAuthStore(state => state.fetchUserData);
 
@@ -147,12 +153,12 @@ export default function MedicoHome() {
   };
 
   // Cargar slots disponibles desde el servicio de citas y normalizar respuesta
-  const cargarSlots = async (modalidadFilter?: string, duracionCita: number = 30) => {
+  const cargarSlots = async (modalidadFilter?: string, duracionCita: number = 30, fecha_inicio_arg?: string, fecha_fin_arg?: string) => {
     if (!medicoId) return;
     setSlotsLoading(true);
     try {
-      const fecha_inicio = new Date().toISOString().split('T')[0];
-      const fecha_fin = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const fecha_inicio = fecha_inicio_arg ?? new Date().toISOString().split('T')[0];
+      const fecha_fin = fecha_fin_arg ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const params: any = {
         fecha_inicio,
         fecha_fin,
@@ -182,7 +188,117 @@ export default function MedicoHome() {
         slots = slots.filter(s => String(s.modalidad || s.tipo || s.mode || '').toLowerCase() === mf);
       }
 
-      setProximosSlots(slots);
+      // Log some samples for debugging which fields the backend returns
+      try {
+        console.debug('[perfil] cargarSlots - sample slots:', slots.slice(0, 3));
+      } catch (e) {
+        // ignore logging errors in older browsers
+      }
+
+      // Normalizar e intentar añadir `disponibilidad_id` cuando falte
+      const normalized = (slots || []).map((slot: any) => {
+        let dispId = getDisponibilidadIdFromSlot(slot);
+
+        // Si no lo encontramos directamente, intentar emparejar con las disponibilidades
+        // configuradas del usuario (por hora y modalidad) como heurística. No eliminar
+        // slots por esta operación — sólo añadimos la referencia si se detecta.
+        if (!dispId && Array.isArray(user?.disponibilidades) && user.disponibilidades.length > 0) {
+          try {
+            const slotDate = parseSlotDate(slot?.fecha_hora_inicio || slot?.fecha_hora || slot?.start || slot?.datetime || slot?.fecha || slot);
+            const slotTime = slotDate ? slotDate.toTimeString().slice(0,5) : null; // "HH:MM"
+            const slotDay = slotDate ? slotDate.getDay() : null; // 0-6 (domingo=0)
+
+            for (const d of user.disponibilidades) {
+              const dd: any = d as any;
+              const dHoraInicio = (dd?.hora_inicio || '').toString().slice(0,5);
+              // `dia_semana` en API puede ser 1-7 o 0-6; intentar ambos
+              const dDiaSemana = typeof dd?.dia_semana === 'number' ? dd.dia_semana : parseInt(dd?.dia_semana, 10);
+              const dDayNormalized = Number.isFinite(dDiaSemana) ? (dDiaSemana > 7 ? dDiaSemana : dDiaSemana - 1) : undefined; // convert 1-7 -> 0-6
+              const modoSlot = (slot?.modalidad || slot?.tipo || '').toString().toUpperCase();
+              const modoDisp = (dd?.modalidad || dd?.modo || '').toString().toUpperCase();
+
+              const dayMatches = slotDay === dDayNormalized || slotDay === dDiaSemana || dDiaSemana === slotDay;
+
+              if (slotTime && dHoraInicio && slotTime === dHoraInicio && (dayMatches || !dDiaSemana)) {
+                // Coincide hora de inicio (y opcionalmente día); tomar id de la disponibilidad configurada
+                dispId = dd?.id || dd?.disponibilidad_id || dd?._id || dispId;
+                if (dispId) break;
+              }
+
+              // Si modalidad está presente en ambos, comparar también (más estricta)
+              if (slotTime && dHoraInicio && modoSlot && modoDisp && slotTime === dHoraInicio && modoSlot === modoDisp && (dayMatches || !dDiaSemana)) {
+                dispId = dd?.id || dd?.disponibilidad_id || dd?._id || dispId;
+                if (dispId) break;
+              }
+            }
+          } catch (e) {
+            // ignore matching errors
+          }
+        }
+
+        return { ...slot, disponibilidad_id: dispId };
+      });
+
+      try {
+        console.debug('[perfil] cargarSlots - normalized sample (before dedupe):', (normalized || []).slice(0,3));
+      } catch (e) {}
+
+      // Evitar duplicados: algunos backends devuelven tanto la hora de inicio como la hora de fin
+      // como entradas distintas. Queremos un slot por hora de inicio. Agrupamos por fecha/hora de inicio.
+      const withStart = (normalized || []).map((slot: any) => {
+        const startDate = parseSlotDate(slot?.fecha_hora_inicio || slot?.fecha_hora || slot?.start || slot?.datetime || slot?.fecha || slot);
+        const startKey = startDate ? startDate.toISOString() : JSON.stringify(slot);
+        return { __slot_start_iso: startKey, ...slot };
+      });
+
+      const dedupeMap = new Map<string, any>();
+      for (const s of withStart) {
+        if (!dedupeMap.has(s.__slot_start_iso)) {
+          dedupeMap.set(s.__slot_start_iso, s);
+        }
+      }
+
+      const finalSlots = Array.from(dedupeMap.values()).map(({ __slot_start_iso, ...rest }) => rest);
+
+      try {
+        console.debug('[perfil] cargarSlots - normalized sample (after dedupe):', (finalSlots || []).slice(0,3));
+      } catch (e) {}
+
+      // Mostrar sólo un slot por disponibilidad: preferimos los slots que coinciden
+      // con la hora de inicio de las disponibilidades configuradas del usuario
+      // o que ya tienen `disponibilidad_id` detectado.
+      const finalFiltered = (finalSlots || []).filter((slot: any) => {
+        // si ya tiene disponibilidad_id, mantener
+        if (slot?.disponibilidad_id) return true;
+        try {
+          const startDate = parseSlotDate(slot?.fecha_hora_inicio || slot?.fecha_hora || slot?.start || slot?.datetime || slot?.fecha || slot);
+          if (!startDate) return false;
+          const slotTime = startDate.toTimeString().slice(0,5); // HH:MM
+          const slotDay = startDate.getDay(); // 0-6
+
+          if (Array.isArray(user?.disponibilidades)) {
+            for (const d of user.disponibilidades) {
+              const dd: any = d as any;
+              const dHoraInicio = (dd?.hora_inicio || '').toString().slice(0,5);
+              const dDiaSemana = typeof dd?.dia_semana === 'number' ? dd.dia_semana : parseInt(dd?.dia_semana, 10);
+              const dDayNormalized = Number.isFinite(dDiaSemana) ? (dDiaSemana > 7 ? dDiaSemana : dDiaSemana - 1) : undefined;
+
+              const dayMatches = dDayNormalized === undefined ? true : (slotDay === dDayNormalized || slotDay === dDiaSemana);
+              if (dHoraInicio && slotTime === dHoraInicio && dayMatches) return true;
+            }
+          }
+        } catch (e) {
+          return false;
+        }
+
+        return false;
+      });
+
+      try {
+        console.debug('[perfil] cargarSlots - final filtered slots:', (finalFiltered || []).slice(0,6));
+      } catch (e) {}
+
+      setProximosSlots(finalFiltered);
     } catch (e) {
       console.error('Error cargando slots:', e);
       setProximosSlots([]);
@@ -220,6 +336,77 @@ export default function MedicoHome() {
     const timePart = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const modo = (slot?.modalidad || slot?.tipo || '').toString().toUpperCase() || 'VIRTUAL';
     return `${datePart}, ${timePart} - ${modo}`;
+  };
+
+  // Intentar extraer un id de disponibilidad desde distintos posibles campos del slot
+  const getDisponibilidadIdFromSlot = (slot: any): string | undefined => {
+    if (!slot) return undefined;
+    //
+    return (
+      slot.disponibilidad_id ||
+      slot.disponibilidadId ||
+      slot.disponibilidad?.id ||
+      slot.disponibilidad?.disponibilidad_id ||
+      slot.disponibilidad?.id_disponibilidad ||
+      slot.id_disponibilidad ||
+      slot.disponibilidad?._id ||
+      slot._id ||
+      slot.id ||
+      slot.availability_id ||
+      slot.availability?.id ||
+      slot.availability?._id ||
+      slot.uuid ||
+      undefined
+    );
+  };
+
+  // Intent to delete: validate and open UI confirmation (modal) without showing the id.
+  const attemptDeleteDisponibilidad = (disponibilidadId: string) => {
+    const uuidLike = typeof disponibilidadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(disponibilidadId);
+    if (!uuidLike) {
+      toast.error('ID de disponibilidad inválido. Operación cancelada por seguridad.');
+      try { console.warn('[perfil] intento de eliminar id con formato inválido:', disponibilidadId); } catch (e) {}
+      return;
+    }
+
+    const existsInUser = Array.isArray(user?.disponibilidades) && user.disponibilidades.some((d: any) => {
+      const dd: any = d as any;
+      return [dd?.id, dd?.disponibilidad_id, dd?._id].some(x => x && String(x) === String(disponibilidadId));
+    });
+
+    if (!existsInUser) {
+      toast.error('ID no coincide con tus disponibilidades. Operación cancelada por seguridad.');
+      try { console.warn('[perfil] intento de eliminar id no reconocido:', disponibilidadId, 'user.disponibilidades:', user?.disponibilidades); } catch (e) {}
+      return;
+    }
+
+    // Abrir modal de confirmación (sin mostrar el id)
+    setPendingDeleteId(disponibilidadId);
+    setOpenDeleteConfirm(true);
+  };
+
+  const confirmDeleteDisponibilidad = async () => {
+    const disponibilidadId = pendingDeleteId;
+    setOpenDeleteConfirm(false);
+    setPendingDeleteId(null);
+    if (!disponibilidadId) return;
+
+    try {
+      setDeletingId(disponibilidadId);
+      console.debug('[perfil] eliminando disponibilidad id:', disponibilidadId);
+      const resp = await medicosService.deleteMiDisponibilidad(disponibilidadId);
+      console.debug('[perfil] respuesta deleteMiDisponibilidad:', resp);
+      toast.success('Disponibilidad eliminada');
+      // refrescar user y slots
+      await fetchUserData();
+      await cargarSlots(modalidadSelect, pageSize);
+    } catch (err: any) {
+      console.error('Error eliminando disponibilidad (detalle):', err);
+      try { console.error('Error.response:', err?.response); console.error('Error.response.data:', err?.response?.data); } catch (e) {}
+      toast.error(err?.response?.data?.error || err?.message || 'Error eliminando disponibilidad');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   // Función para obtener nombre completo del paciente
@@ -330,7 +517,7 @@ export default function MedicoHome() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Columna izquierda - Horarios disponibles */}
           <div className="lg:col-span-1 space-y-6">
             {/* Horarios disponibles desde la API */}
@@ -385,23 +572,91 @@ export default function MedicoHome() {
                   </Button>
                 </div>
 
-                <div className="relative">
-                  <select
-                    value={selectedSlot}
-                    onChange={(e) => setSelectedSlot(e.target.value)}
-                    onFocus={() => { if (proximosSlots.length === 0 && !slotsLoading) cargarSlots(modalidadSelect); }}
-                    className="w-full border-2 border-slate-200 rounded-xl p-3 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 appearance-none cursor-pointer"
-                  >
-                    <option value="">-- Consultar horarios disponibles --</option>
-                    {slotsLoading && <option value="">🔄 Cargando horarios...</option>}
-                    {!slotsLoading && proximosSlots.length === 0 && <option value="">📭 No hay horarios disponibles</option>}
-                    {!slotsLoading && proximosSlots.map((slot, i) => (
-                      <option key={i} value={JSON.stringify(slot)}>
-                        {formatSlotLabel(slot)}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                <div>
+                  <div className="mb-2">
+                    <div className="text-sm text-slate-600">Consultar horarios disponibles</div>
+                  </div>
+
+                  {/* Fecha filter removed as requested */}
+
+                  {slotsLoading ? (
+                    <div className="text-center py-6">🔄 Cargando horarios...</div>
+                  ) : proximosSlots.length === 0 ? (
+                    <div className="text-sm text-slate-500 py-4">📭 No hay horarios disponibles</div>
+                  ) : (
+                    (() => {
+                      const totalPages = Math.max(1, Math.ceil(proximosSlots.length / pageSize));
+                      const start = (currentPage - 1) * pageSize;
+                      const paginated = proximosSlots.slice(start, start + pageSize);
+                      return (
+                        <>
+                          <div className="overflow-auto">
+                            <table className="w-full text-sm table-fixed border-collapse">
+                              <thead>
+                                <tr className="text-left text-slate-600">
+                                  <th className="py-2 pr-4">Fecha</th>
+                                  <th className="py-2 pr-4">Hora</th>
+                                  <th className="py-2 pr-4">Modalidad</th>
+                                  <th className="py-2 pr-4 text-right">Acción</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {paginated.map((slot, i) => {
+                                  const d = parseSlotDate(slot?.fecha_hora_inicio || slot?.fecha_hora || slot?.start || slot?.datetime || slot?.fecha || slot) ?? new Date();
+                                  const datePart = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                  const timePart = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                                  const modo = (slot?.modalidad || slot?.tipo || '').toString().toUpperCase() || 'VIRTUAL';
+                                  const value = JSON.stringify(slot);
+                                  const dispId = slot?.disponibilidad_id || getDisponibilidadIdFromSlot(slot);
+                                  return (
+                                    <tr key={i} className={`hover:bg-slate-50 ${selectedSlot === value ? 'bg-blue-50' : ''}`}>
+                                      <td className="py-2 pr-4 text-slate-700 cursor-pointer" onClick={() => setSelectedSlot(value)}>{datePart}</td>
+                                      <td className="py-2 pr-4 text-slate-700 cursor-pointer" onClick={() => setSelectedSlot(value)}>{timePart}</td>
+                                      <td className="py-2 pr-4 text-slate-700 cursor-pointer" onClick={() => setSelectedSlot(value)}>{modo}</td>
+                                      <td className="py-2 pr-4 text-slate-700 text-right">
+                                        <Button
+                                          size="sm"
+                                          variant={dispId ? 'destructive' : 'ghost'}
+                                          className={`h-7 w-7 p-1 ${!dispId ? 'opacity-60' : ''}`}
+                                          disabled={!dispId || slotsLoading || deletingId === String(dispId)}
+                                          aria-disabled={!dispId || slotsLoading || deletingId === String(dispId)}
+                                          title={dispId ? 'Eliminar disponibilidad' : 'ID no detectado'}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!dispId) {
+                                              toast.error('No se detectó el id de disponibilidad. Abre la consola para más detalles.');
+                                              try { console.debug('[perfil] slot sin id:', slot); } catch (err) {}
+                                              return;
+                                            }
+                                            attemptDeleteDisponibilidad(String(dispId));
+                                          }}
+                                        >
+                                          {deletingId === String(dispId) ? (
+                                            <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                          ) : (
+                                            <Trash className="w-4 h-4" />
+                                          )}
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="flex items-center justify-between mt-3">
+                            <div className="text-sm text-slate-500">Mostrando {Math.min(start + 1, proximosSlots.length)}-{Math.min(start + paginated.length, proximosSlots.length)} de {proximosSlots.length}</div>
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" variant="outline" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage <= 1}>Anterior</Button>
+                              <div className="text-sm text-slate-600 px-2">{currentPage} / {totalPages}</div>
+                              <Button size="sm" variant="outline" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}>Siguiente</Button>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()
+                  )}
                 </div>
 
                 {selectedSlot && (
@@ -438,7 +693,7 @@ export default function MedicoHome() {
                     <DialogTrigger asChild>
                       <Button size="sm" variant="default" className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-full px-4 py-2 shadow-lg hover:from-blue-700 transition-all duration-200">
                         <Calendar className="w-4 h-4" />
-                        Configurar Disponibilidad
+                        Añadir Disponibilidad
                       </Button>
                     </DialogTrigger>
 
@@ -486,7 +741,6 @@ export default function MedicoHome() {
 
                         <div className="flex gap-2">
                           <Button type="button" onClick={() => {
-                            // Añadir a la lista local; backend espera hh:mm:ss
                             const item = {
                               dia_semana: diaSemana,
                               hora_inicio: `${horaInicio}:00`,
@@ -527,7 +781,6 @@ export default function MedicoHome() {
                               setSaving(true);
                               await medicosService.setMiDisponibilidad({ disponibilidades: nuevasDisponibilidades });
                               toast.success('Disponibilidad guardada con éxito.');
-                              // Refrescar perfil del usuario para mostrar disponibilidades
                               await fetchUserData();
                               setNuevasDisponibilidades([]);
                               setOpenDisponibilidad(false);
@@ -542,21 +795,28 @@ export default function MedicoHome() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                </div>
-                <div className="space-y-3">
-                  {horariosDisponibles.map((horario, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-blue-300 transition-all duration-300">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-slate-700">{horario}</span>
-                    </div>
-                  ))}
+                  {/* Confirmación personalizada para eliminar disponibilidades */}
+                  <Dialog open={openDeleteConfirm} onOpenChange={setOpenDeleteConfirm}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Eliminar disponibilidad</DialogTitle>
+                        <DialogDescription>¿Estás seguro de eliminar esta disponibilidad? Esta acción no se puede deshacer.</DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter className="mt-4">
+                        <div className="flex items-center justify-end gap-2 w-full">
+                          <Button type="button" variant="outline" onClick={() => { setOpenDeleteConfirm(false); setPendingDeleteId(null); }}>Cancelar</Button>
+                          <Button type="button" variant="destructive" onClick={async () => { await confirmDeleteDisponibilidad(); }}>Eliminar</Button>
+                        </div>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Columna derecha - Calificaciones */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <Card className="border-0 bg-white shadow-xl">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
