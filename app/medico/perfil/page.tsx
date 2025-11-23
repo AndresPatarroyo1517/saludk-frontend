@@ -18,6 +18,10 @@ import {
   Filter,
   ChevronDown
 } from 'lucide-react';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { medicosService } from '@/lib/api/services/medicosService';
+import { toast } from 'sonner';
 
 // Interfaces para las calificaciones basadas en la respuesta real
 interface Calificacion {
@@ -58,6 +62,17 @@ export default function MedicoHome() {
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [modalidadSelect, setModalidadSelect] = useState<'ALL' | 'VIRTUAL' | 'PRESENCIAL'>('ALL');
   const [isVisible, setIsVisible] = useState(false);
+
+  // Estados para el modal de disponibilidad (declarados al inicio para respetar el orden de Hooks)
+  const [openDisponibilidad, setOpenDisponibilidad] = useState(false);
+  const [diaSemana, setDiaSemana] = useState<number>(0);
+  const [horaInicio, setHoraInicio] = useState<string>('08:00');
+  const [horaFin, setHoraFin] = useState<string>('09:00');
+  const [modalidad, setModalidad] = useState<'PRESENCIAL' | 'VIRTUAL'>('PRESENCIAL');
+  const [nuevasDisponibilidades, setNuevasDisponibilidades] = useState<Array<any>>([]);
+  const [saving, setSaving] = useState(false);
+
+  const fetchUserData = useAuthStore(state => state.fetchUserData);
 
   // Obtener el ID real del médico desde posibles ubicaciones (datos_personales.id, medico_id, user.id)
   const medicoId = user?.datos_personales?.id || (user as any)?.medico_id || user?.id;
@@ -418,6 +433,116 @@ export default function MedicoHome() {
               </CardHeader>
 
               <CardContent>
+                <div className="flex justify-center mb-4">
+                  <Dialog open={openDisponibilidad} onOpenChange={setOpenDisponibilidad}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="default" className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-full px-4 py-2 shadow-lg hover:from-blue-700 transition-all duration-200">
+                        <Calendar className="w-4 h-4" />
+                        Configurar Disponibilidad
+                      </Button>
+                    </DialogTrigger>
+
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Configurar horarios de disponibilidad</DialogTitle>
+                        <DialogDescription>Agrega uno o varios horarios para que los pacientes puedan reservar.</DialogDescription>
+                      </DialogHeader>
+
+                      <div className="space-y-3 mt-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="flex flex-col">
+                            <span className="text-sm text-slate-600 mb-1">Día de la semana</span>
+                            <select value={diaSemana} onChange={(e) => setDiaSemana(parseInt(e.target.value, 10))} className="border rounded-md p-2">
+                              <option value={0}>Lunes</option>
+                              <option value={1}>Martes</option>
+                              <option value={2}>Miércoles</option>
+                              <option value={3}>Jueves</option>
+                              <option value={4}>Viernes</option>
+                              <option value={5}>Sábado</option>
+                              <option value={6}>Domingo</option>
+                            </select>
+                          </label>
+
+                          <label className="flex flex-col">
+                            <span className="text-sm text-slate-600 mb-1">Modalidad</span>
+                            <select value={modalidad} onChange={(e) => setModalidad(e.target.value as any)} className="border rounded-md p-2">
+                              <option value="PRESENCIAL">Presencial</option>
+                              <option value="VIRTUAL">Virtual</option>
+                            </select>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="flex flex-col">
+                            <span className="text-sm text-slate-600 mb-1">Hora inicio</span>
+                            <Input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                          </label>
+
+                          <label className="flex flex-col">
+                            <span className="text-sm text-slate-600 mb-1">Hora fin</span>
+                            <Input type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+                          </label>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="button" onClick={() => {
+                            // Añadir a la lista local; backend espera hh:mm:ss
+                            const item = {
+                              dia_semana: diaSemana,
+                              hora_inicio: `${horaInicio}:00`,
+                              hora_fin: `${horaFin}:00`,
+                              modalidad
+                            };
+                            setNuevasDisponibilidades(prev => [...prev, item]);
+                          }} size="sm">Agregar horario</Button>
+
+                          <Button type="button" variant="ghost" onClick={() => { setNuevasDisponibilidades([]); }}>Limpiar</Button>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">Horarios a guardar</h4>
+                          <div className="space-y-2">
+                            {nuevasDisponibilidades.length === 0 && <div className="text-sm text-slate-500">No hay horarios añadidos.</div>}
+                            {nuevasDisponibilidades.map((h, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-slate-50 p-2 rounded-md border">
+                                <div className="text-sm text-slate-700">{['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][h.dia_semana]} {h.hora_inicio.slice(0,5)} - {h.hora_fin.slice(0,5)} • {h.modalidad}</div>
+                                <div>
+                                  <Button size="sm" variant="destructive" onClick={() => setNuevasDisponibilidades(prev => prev.filter((_, i) => i !== idx))}>Eliminar</Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <DialogFooter className="mt-4">
+                        <div className="flex items-center justify-end gap-2 w-full">
+                          <Button type="button" variant="outline" onClick={() => setOpenDisponibilidad(false)}>Cancelar</Button>
+                          <Button type="button" onClick={async () => {
+                            if (nuevasDisponibilidades.length === 0) {
+                              toast.error('Añade al menos un horario antes de guardar.');
+                              return;
+                            }
+                            try {
+                              setSaving(true);
+                              await medicosService.setMiDisponibilidad({ disponibilidades: nuevasDisponibilidades });
+                              toast.success('Disponibilidad guardada con éxito.');
+                              // Refrescar perfil del usuario para mostrar disponibilidades
+                              await fetchUserData();
+                              setNuevasDisponibilidades([]);
+                              setOpenDisponibilidad(false);
+                            } catch (err) {
+                              console.error('Error guardando disponibilidad', err);
+                              toast.error('Error al guardar disponibilidad');
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}>{saving ? 'Guardando...' : 'Guardar disponibilidad'}</Button>
+                        </div>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <div className="space-y-3">
                   {horariosDisponibles.map((horario, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-blue-300 transition-all duration-300">
