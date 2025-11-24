@@ -115,6 +115,16 @@ export const directorService = {
     const response = await apiClient.post<RegistroResponse>('/registro/medico', data);
     return response.data;
   },
+
+  actualizarMedico: async (userId: string, data:any) => {
+    const response = await apiClient.put(`/medicos/modificar/${userId}`, data);
+    return response.data;
+  },
+
+  desactivarMedico: async (userId: string) => {
+    const response = await apiClient.put(`/medicos/desactivar/${userId}`);
+    return response.data;
+  },
 };
 
 export default directorService;

@@ -1,22 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect} from "react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext } from "@/components/ui/pagination";
 import { useRouter } from "next/navigation";
 import { medicosService } from '@/lib/api/services/medicosService';
 import { User } from "lucide-react";
 import { Label } from '@/components/ui/label';
-
-interface Paginacion {
-    total: number;
-    limite: number;
-    offset: number;
-    pagina_actual: number;
-    total_paginas: number;
-    tiene_siguiente: boolean;
-    tiene_anterior: boolean;
-}
+import { useMedicosStore } from "@/lib/store/medicosStore";
 
 const localidades = [
     "Chapinero",
@@ -41,16 +32,13 @@ const especialidades = [
 
 export default function DoctoresPage() {
     const router = useRouter();
+    const {
+        medicos, paginacion,
+        search, especialidad, localidad, calificacion, page,
 
-    const [medicos, setMedicos] = useState<any[]>([]);
-    const [paginacion, setPaginacion] = useState<Paginacion | null>(null);
-
-    const [search, setSearch] = useState("");
-    const [especialidad, setEspecialidad] = useState("");
-    const [localidad, setLocalidad] = useState("");
-    const [calificacion, setCalificacion] = useState("");
-
-    const [page, setPage] = useState(1);
+        setMedicos, setPaginacion,
+        setSearch, setEspecialidad, setLocalidad, setCalificacion, setPage,
+    } = useMedicosStore();
 
     async function cargarMedicos() {
         const filtros: any = {
@@ -75,9 +63,13 @@ export default function DoctoresPage() {
     }, []);
 
     // Volver a cargar si hay cambio de página
-    useEffect(() => {
+    /* useEffect(() => {
         cargarMedicos();
     }, [page]);
+ */
+    const handleVer = (id:string) => {
+        router.push(`/director/medicos/${id}`)
+    };
 
     return (
         <div className="p-6 flex flex-col gap-6 w-full">
@@ -193,7 +185,7 @@ export default function DoctoresPage() {
                                 <TableCell className="flex justify-end">
                                     <button
                                         className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md text-sm"
-                                        onClick={() => router.push(`/director/medicos/${m.id}`)}
+                                        onClick={() => handleVer(m.id)}
                                     >
                                         Ver
                                     </button>
