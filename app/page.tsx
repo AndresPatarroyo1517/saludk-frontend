@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Stethoscope, 
-  Calendar, 
-  ShoppingBag, 
-  FileText, 
-  Shield, 
-  Clock, 
-  CheckCircle, 
+import {
+  Stethoscope,
+  Calendar,
+  ShoppingBag,
+  FileText,
+  Shield,
+  Clock,
+  CheckCircle,
   Sparkles,
   Heart,
   Star,
@@ -75,7 +75,7 @@ export default function Home() {
               <div className="h-1 w-0 group-hover:w-full bg-gradient-to-r from-blue-600 to-cyan-500 transition-all duration-300 rounded-full"></div>
             </div>
           </Link>
-          
+
           <nav className="hidden lg:flex items-center space-x-8">
             <Link href="#servicios" className="text-slate-700 hover:text-blue-600 transition-all duration-300 font-medium hover:scale-105">
               Servicios
@@ -139,17 +139,17 @@ export default function Home() {
               <Sparkles className="w-4 h-4 mr-2" />
               Plataforma de Salud #1 en Colombia
             </Badge>
-            
+
             <h1 className="text-5xl lg:text-7xl font-bold text-slate-900 mb-6 leading-tight">
-              Tu Salud en 
+              Tu Salud en
               <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent"> Tus Manos</span>
             </h1>
-            
+
             <p className="text-xl lg:text-2xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Atención médica de calidad, gestión de historial clínico y farmacia online 
+              Atención médica de calidad, gestión de historial clínico y farmacia online
               <span className="text-blue-600 font-semibold"> en una sola plataforma</span>
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Link href={isAuthenticated ? "/dashboard" : "/register"}>
                 <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
@@ -183,7 +183,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-        
+
         {/* Elementos decorativos */}
         <div className="absolute top-20 left-10 w-20 h-20 bg-blue-200 rounded-full blur-xl opacity-30 animate-pulse"></div>
         <div className="absolute top-40 right-20 w-16 h-16 bg-cyan-200 rounded-full blur-xl opacity-40 animate-pulse delay-75"></div>
@@ -198,7 +198,7 @@ export default function Home() {
               Nuestros Servicios
             </Badge>
             <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-              Todo lo que necesitas para tu 
+              Todo lo que necesitas para tu
               <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent"> bienestar</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
@@ -237,8 +237,8 @@ export default function Home() {
                 features: ["Encriptación AES-256", "Cumplimiento HIPAA", "Auditoría regular"]
               }
             ].map((service, index) => (
-              <Card 
-                key={index} 
+              <Card
+                key={index}
                 className="group hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white to-slate-50 hover:scale-105 cursor-pointer"
               >
                 <CardHeader className="pb-4">
@@ -274,7 +274,7 @@ export default function Home() {
               Precios Transparentes
             </Badge>
             <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-              Planes que se adaptan a 
+              Planes que se adaptan a
               <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent"> tus necesidades</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
@@ -290,18 +290,18 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
               {planes.map((plan, index) => {
-                const isPopular = index === 1;
+                const isPopular = index === 1; // El del medio es el popular
                 const precio = parseFloat(plan.precio_mensual);
 
                 return (
                   <div key={plan.id} className="relative">
                     <Card className={`
-                      h-full border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500
-                      ${isPopular ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}
-                      group hover:scale-105
-                    `}>
+                h-full border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500
+                ${isPopular ? 'ring-2 ring-blue-500 ring-opacity-50 transform lg:scale-105' : ''}
+                group hover:scale-105
+              `}>
                       {isPopular && (
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
                           <div className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-6 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
@@ -312,14 +312,14 @@ export default function Home() {
                       )}
 
                       <CardHeader className="pb-6 text-center">
-                        <CardTitle className="text-3xl text-slate-900">{plan.nombre}</CardTitle>
+                        <CardTitle className="text-2xl lg:text-3xl text-slate-900">{plan.nombre}</CardTitle>
                         <div className="my-6">
-                          <div className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                          <div className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
                             ${precio.toLocaleString('es-CO')}
                           </div>
                           <div className="text-slate-600 text-lg">por mes</div>
                         </div>
-                        <CardDescription className="text-slate-600 text-lg">
+                        <CardDescription className="text-slate-600 text-base lg:text-lg">
                           {plan.descripcion}
                         </CardDescription>
                       </CardHeader>
@@ -328,27 +328,27 @@ export default function Home() {
                         <ul className="space-y-4">
                           {plan.beneficios.map((beneficio, idx) => (
                             <li key={idx} className="flex items-start group/item">
-                              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mr-3 mt-0.5 group-hover/item:scale-110 transition-transform">
+                              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mr-3 mt-0.5 group-hover/item:scale-110 transition-transform flex-shrink-0">
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                               </div>
-                              <span className="text-slate-700 text-lg">{beneficio}</span>
+                              <span className="text-slate-700 text-base lg:text-lg">{beneficio}</span>
                             </li>
                           ))}
                         </ul>
 
-                        <Link 
+                        <Link
                           href={isAuthenticated ? "/dashboard/planes" : "/register"}
                           className="block"
                         >
                           <Button className={`
-                            w-full py-6 text-lg font-semibold transition-all duration-300
-                            ${isPopular 
-                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-lg hover:shadow-xl' 
+                      w-full py-4 lg:py-6 text-base lg:text-lg font-semibold transition-all duration-300
+                      ${isPopular
+                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-lg hover:shadow-xl'
                               : 'bg-slate-900 hover:bg-slate-800 shadow-lg hover:shadow-xl'
                             }
-                          `}>
+                    `}>
                             {isAuthenticated ? 'Suscribirse Ahora' : 'Comenzar Gratis'}
-                            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                            <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                           </Button>
                         </Link>
                       </CardContent>
@@ -377,7 +377,7 @@ export default function Home() {
               ¿Por qué elegirnos?
             </Badge>
             <h2 className="text-4xl lg:text-5xl font-bold mb-6">
-              La experiencia de salud 
+              La experiencia de salud
               <span className="text-cyan-200"> más completa</span>
             </h2>
             <p className="text-xl text-blue-100 max-w-2xl mx-auto">
@@ -406,8 +406,8 @@ export default function Home() {
                 stats: "200+ profesionales"
               }
             ].map((benefit, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/15 transition-all duration-500 group hover:scale-105 border border-white/20"
               >
                 <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -434,12 +434,12 @@ export default function Home() {
             <Badge className="mb-6 bg-white/20 text-white border-0 px-4 py-2 backdrop-blur-sm">
               Comienza Hoy
             </Badge>
-            
+
             <h2 className="text-4xl lg:text-6xl font-bold mb-6">
-              Transforma tu experiencia de 
+              Transforma tu experiencia de
               <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent"> salud</span>
             </h2>
-            
+
             <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto leading-relaxed">
               Únete a miles de colombianos que ya confían en SaludK para su bienestar y el de su familia
             </p>
@@ -494,14 +494,14 @@ export default function Home() {
                 Tu salud, nuestra prioridad. Plataforma de salud digital líder en Colombia.
               </p>
             </div>
-            
+
             {[
               {
                 title: "Servicios",
                 links: ["Consultas Médicas", "Farmacia Online", "Historial Digital", "Emergency Care"]
               },
               {
-                title: "Empresa", 
+                title: "Empresa",
                 links: ["Acerca de", "Contacto", "Términos", "Privacidad"]
               },
               {
@@ -523,16 +523,16 @@ export default function Home() {
               </div>
             ))}
           </div>
-          
+
           <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-slate-400 text-center md:text-left mb-4 md:mb-0">
               &copy; 2024 SaludK. Todos los derechos reservados.
             </p>
             <div className="flex space-x-6">
               {["Twitter", "Facebook", "Instagram", "LinkedIn"].map((social) => (
-                <a 
-                  key={social} 
-                  href="#" 
+                <a
+                  key={social}
+                  href="#"
                   className="text-slate-400 hover:text-white transition-colors duration-300 hover:scale-110 transform"
                 >
                   {social}
