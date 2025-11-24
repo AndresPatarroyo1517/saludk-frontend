@@ -15,6 +15,10 @@ export default function DirectorPlanesPage() {
   const [planes, setPlanes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const BASE_API_URL =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:3000'
+    : process.env.NEXT_PUBLIC_API_URL;
 
   // modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -57,7 +61,7 @@ export default function DirectorPlanesPage() {
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetch('http://localhost:3000/planes/admin', { credentials: 'include', signal: ctrl.signal });
+        const resp = await fetch(`${BASE_API_URL}/planes/admin`, { credentials: 'include', signal: ctrl.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         const listCandidate = data?.data ?? data ?? [];
@@ -140,7 +144,7 @@ export default function DirectorPlanesPage() {
 
       if (editingPlan) {
         // PUT /planes/{id}
-        const resp = await fetch(`http://localhost:3000/planes/${editingPlan.id}`, {
+        const resp = await fetch(`${BASE_API_URL}/planes/${editingPlan.id}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -159,7 +163,7 @@ export default function DirectorPlanesPage() {
         toast({ title: 'Actualizado', description: 'Plan actualizado correctamente.', className: 'bg-emerald-50 border-emerald-200 text-emerald-900' });
       } else {
         // POST /planes
-        const resp = await fetch('http://localhost:3000/planes', {
+        const resp = await fetch(`${BASE_API_URL}/planes`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -201,7 +205,7 @@ export default function DirectorPlanesPage() {
         activo: target,
       } as any;
 
-      const resp = await fetch(`http://localhost:3000/planes/${plan.id}`, {
+      const resp = await fetch(`${BASE_API_URL}/planes/${plan.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

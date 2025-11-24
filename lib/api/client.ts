@@ -4,7 +4,7 @@ import { useAuthStore } from '@/lib/store/authStore';
 const baseURLTo =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:3000'
-    : process.env.NEXT_PUBLIC_API_URL || '';
+    : process.env.NEXT_PUBLIC_API_URL;
 
 const apiClient = axios.create({
   baseURL: baseURLTo,
@@ -28,6 +28,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<any>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    console.log('cosas', baseURLTo);
 
     // ✅ No es 401, rechazar directamente
     if (error.response?.status !== 401) {
