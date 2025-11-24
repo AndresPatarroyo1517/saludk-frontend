@@ -59,6 +59,25 @@ export const medicosService = {
     const response = await apiClient.get(`/citas/medico/${medicoId}/estadisticas`);
     return response.data;
   },
+
+  // Obtener la disponibilidad configurada del médico autenticado
+  getMiDisponibilidad: async () => {
+    const response = await apiClient.get('/medicos/mi-disponibilidad');
+    return response.data;
+  },
+
+  // Configurar la disponibilidad del médico autenticado
+  setMiDisponibilidad: async (payload: { disponibilidades: Array<any> }) => {
+    const response = await apiClient.post('/medicos/mi-disponibilidad', payload);
+    return response.data;
+  }
+,
+
+  // Eliminar una disponibilidad del médico autenticado
+  deleteMiDisponibilidad: async (disponibilidadId: string) => {
+    const response = await apiClient.delete(`/medicos/mi-disponibilidad/${disponibilidadId}`);
+    return response.data;
+  }
 };
 
 export default medicosService;
